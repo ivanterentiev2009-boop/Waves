@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "com.example.waves"
     compileSdk = 35
-    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "0.1" }
+    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 3; versionName = "0.3" }
     signingConfigs { getByName("debug") { storeFile = file("debug.keystore"); storePassword = "android"; keyAlias = "androiddebugkey"; keyPassword = "android" } }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

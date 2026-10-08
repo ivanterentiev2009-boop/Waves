@@ -20,6 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -58,10 +61,7 @@ fun Controls(c: MediaController?, playing: Boolean) {
 
 @Composable
 fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
-    val pos = rememberPosition(c, np.playing)
-    val dur = (c?.duration ?: 0L).coerceAtLeast(0L)
-    val prog by animateFloatAsState(if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f,
-        tween(250, easing = LinearEasing), label = "p")
+    val pos = rememberPosition(c, np.playing, 100)
     Column(Modifier.fillMaxWidth().padding(12.dp).panel(RoundedCornerShape(Style.corner.dp), refract = true)
         .clickable(onClick = onOpen).padding(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -72,10 +72,13 @@ fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
             }
             Controls(c, np.playing)
         }
+        // прогресс рисуется в фазе отрисовки: без перекомпоновки интерфейса
         Box(Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp, end = 4.dp).height(3.dp)
-            .clip(CircleShape).background(Color.White.copy(0.15f))) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(prog).background(Color(Style.accent)))
-        }
+            .clip(CircleShape).background(Color.White.copy(0.15f)).drawBehind {
+                val d = (c?.duration ?: 0L).coerceAtLeast(0L)
+                val f = if (d > 0) (pos.value.toFloat() / d).coerceIn(0f, 1f) else 0f
+                drawRect(Color(Style.accent), size = Size(size.width * f, size.height))
+            })
     }
 }
 
@@ -114,9 +117,10 @@ fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifie
 @Composable
 fun Equalizer(modifier: Modifier = Modifier, playing: Boolean) {
     if (!Style.showViz) return
-    val bars by VizBus.bars.collectAsState()
+    val barsState = VizBus.bars.collectAsState()
     val bottom = Color(Style.accent); val top = lerp(bottom, Color.White, 0.55f)
     Canvas(modifier) {
+        val bars = barsState.value
         val n = bars.size
         val gap = size.width / n * 0.4f
         val w = (size.width - gap * (n - 1)) / n
@@ -131,25 +135,24 @@ fun Equalizer(modifier: Modifier = Modifier, playing: Boolean) {
 enum class OvMode { Bubble, Compact, Full }
 
 @Composable
-fun OverlayPlayer(onDrag: (Float, Float) -> Unit, onClose: () -> Unit) {
+fun OverlayPlayer(onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit) {
     val c = rememberController()
     val np = rememberNowPlaying(c)
     var mode by remember { mutableStateOf(OvMode.Compact) }
-    val drag = Modifier.pointerInput(Unit) { detectDragGestures { ch, d -> ch.consume(); onDrag(d.x, d.y) } }
     AnimatedContent(mode == OvMode.Bubble,
         transitionSpec = { (fadeIn(tween(220)) + scaleIn(tween(260), 0.85f)) togetherWith (fadeOut(tween(140)) + scaleOut(tween(180), 0.85f)) },
         label = "ov") { bubble ->
-        if (bubble) BubbleView(np, drag) { mode = OvMode.Compact }
-        else PanelView(c, np, mode == OvMode.Full, { mode = it }, drag, onClose)
+        if (bubble) { LaunchedEffect(Unit) { onZone(null) }; BubbleView(np) { mode = OvMode.Compact } }
+        else PanelView(c, np, mode == OvMode.Full, { mode = it }, onZone, onClose)
     }
 }
 
 @Composable
-private fun BubbleView(np: NowPlaying, drag: Modifier, onTap: () -> Unit) {
+private fun BubbleView(np: NowPlaying, onTap: () -> Unit) {
     val rot by rememberInfiniteTransition(label = "r").animateFloat(0f, 360f,
         infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "rot")
     OverlaySurface(CircleShape, Style.overlayAlpha,
-        Modifier.size(60.dp).then(drag).pointerInput(Unit) { detectTapGestures { onTap() } }, np.art, 1000f) {
+        Modifier.size(60.dp).pointerInput(Unit) { detectTapGestures { onTap() } }, np.art, 1000f) {
         Box(Modifier.align(Alignment.Center).size(46.dp).rotate(if (np.playing) rot else 0f)
             .clip(CircleShape).background(Color(0x33FFFFFF))) {
             AsyncImage(np.art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -158,19 +161,22 @@ private fun BubbleView(np: NowPlaying, drag: Modifier, onTap: () -> Unit) {
 }
 
 @Composable
-private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMode: (OvMode) -> Unit, drag: Modifier, onClose: () -> Unit) {
+private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMode: (OvMode) -> Unit, onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit) {
     val lyr = rememberLyrics(np.id)
     val pos = rememberPosition(c, np.playing && lyr.lines.isNotEmpty())
     val synced = lyr.lines.any { it.timeMs != null }
-    val active = activeLine(lyr.lines, pos)
+    val active = rememberActive(lyr.lines, pos).value
     var tab by remember { mutableIntStateOf(0) }
-    val w by animateDpAsState(if (full) 300.dp else 230.dp, spring(0.8f, 300f), label = "w")
+    val w by animateDpAsState(if (full) 300.dp else 230.dp, tween(240, easing = FastOutSlowInEasing), label = "w")
     val ls = rememberLazyListState()
     LaunchedEffect(active, tab, full) { if (full && tab == 1 && active >= 0) ls.animateScrollToItem(active, -70) }
 
     OverlaySurface(RoundedCornerShape(Style.corner.dp), Style.overlayAlpha, Modifier.width(w), np.art) {
-        Column(Modifier.padding(10.dp).animateContentSize(spring(0.85f, 350f))) {
-            Row(Modifier.fillMaxWidth().then(drag), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(10.dp).animateContentSize(tween(240, easing = FastOutSlowInEasing))) {
+            Row(Modifier.fillMaxWidth().onGloballyPositioned {
+                val b = it.boundsInRoot()
+                onZone(android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt()))
+            }, verticalAlignment = Alignment.CenterVertically) {
                 Cover(np.art, 36); Spacer(Modifier.width(8.dp))
                 Text(np.title ?: "—", Modifier.weight(1f).clickable { setMode(if (full) OvMode.Compact else OvMode.Full) },
                     color = Color.White, fontWeight = FontWeight.Light, maxLines = 1, overflow = TextOverflow.Ellipsis)

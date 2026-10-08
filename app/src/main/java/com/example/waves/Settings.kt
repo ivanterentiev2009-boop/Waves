@@ -37,6 +37,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
                 Text("Стиль", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Light, color = Color.White)
             }
+            Text("Сборка ${Style.BUILD}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
             Card("Тема") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Стекло", "Минимализм", "AMOLED").forEachIndexed { i, n ->
@@ -66,6 +67,20 @@ fun SettingsScreen(onBack: () -> Unit) {
             Card("Плотность оверлея") {
                 Slider(Style.overlayAlpha, { Style.overlayAlpha = it }, valueRange = 0.3f..1f, onValueChangeFinished = Style::save)
             }
+            if (glassCapable) Card("Оверлей") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Преломление в оверлее (красивее, но медленнее). Выключено: быстрый режим.",
+                        Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Switch(Style.overlayRefract, { Style.overlayRefract = it; Style.save() })
+                }
+            }
+            Card("Оверлей") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Облегчённый режим: быстрее и плавнее, без преломления. Выключи, чтобы увидеть шейдер.",
+                        Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Switch(Style.lightOverlay, { Style.lightOverlay = it; Style.save() })
+                }
+            }
             Card("Эксперимент: размытие под оверлеем") {
                 Text(if (blurOk) "Размытие окон на устройстве доступно" else "На этом устройстве размытие окон отключено или не поддерживается",
                     color = if (blurOk) Color(0xFF6EE7B7) else Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall)
@@ -81,6 +96,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Switch(Style.showViz, { Style.showViz = it; Style.save() })
                 }
             }
+            Text("Waves " + (try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName } catch (_: Exception) { "" }),
+                Modifier.fillMaxWidth().padding(8.dp), color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

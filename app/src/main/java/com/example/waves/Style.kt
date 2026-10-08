@@ -39,17 +39,20 @@ object Style {
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
+    const val BUILD = "r8"
+    var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
+    var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var blurBehind by mutableStateOf(false)   // эксперимент, по умолчанию выключено
 
     fun init(ctx: Context) {
         if (sp != null) return
         val s = ctx.applicationContext.getSharedPreferences("style", 0); sp = s
         theme = s.getInt("theme", 0); accent = s.getInt("accent", accent); glass = s.getFloat("glass", glass)
-        corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false)
+        corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true); overlayRefract = s.getBoolean("ovr", false)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
-            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.apply()
+            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.apply()
     }
 }
 
@@ -157,10 +160,11 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
 }
 
 @Composable
-private fun Modifier.refractSelf(radiusPx: Float?): Modifier {
+private fun Modifier.refractSelf(radiusPx: Float?, alphaValue: Float): Modifier {
     val shader = remember { RuntimeShader(AGSL) }
     val radius = radiusPx ?: with(LocalDensity.current) { Style.corner.dp.toPx() }
     return this.graphicsLayer {
+        this.alpha = alphaValue
         val arr = FloatArray(32); arr[2] = size.width; arr[3] = size.height   // одна область = вся панель
         shader.setFloatUniform("rects", arr)
         shader.setFloatUniform("radius", radius)
@@ -169,20 +173,27 @@ private fun Modifier.refractSelf(radiusPx: Float?): Modifier {
     }
 }
 
-/** Поверхность оверлея: на Android 13+ преломляет размытую обложку трека, иначе матовое стекло. */
+/** Мягкая (маленькая и растянутая) обложка: выглядит размытой, но без дорогого blur-прохода. */
+@Composable
+fun SoftArt(art: Uri?, modifier: Modifier, alpha: Float = 1f) {
+    val ctx = LocalContext.current
+    AsyncImage(coil.request.ImageRequest.Builder(ctx).data(art).size(48).build(), null, modifier,
+        contentScale = ContentScale.Crop, alpha = alpha)
+}
+
+/** Поверхность оверлея: на Android 13+ преломляет мягкую обложку трека, иначе матовое стекло. */
 @Composable
 fun OverlaySurface(shape: Shape, strength: Float, modifier: Modifier, art: Uri?, radiusPx: Float? = null,
                    content: @Composable BoxScope.() -> Unit) {
-    if (!glassCapable) { Box(modifier.panel(shape, strength), content = content); return }
+    if (!glassCapable || !Style.overlayRefract) { Box(modifier.panel(shape, strength), content = content); return }
+    val a = (if (Style.blurBehind) strength.coerceAtMost(0.45f) else strength).coerceIn(0.3f, 1f)
     Box(modifier.clip(shape)) {
-        Box(Modifier.matchParentSize().alpha((if (Style.blurBehind) strength.coerceAtMost(0.45f) else strength).coerceIn(0.3f, 1f))) {
-            Box(Modifier.fillMaxSize().refractSelf(radiusPx)) {
-                Box(Modifier.fillMaxSize().background(Color(0xFF0B0B10)))
-                Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(
-                    Color(Style.accent).copy(0.5f), Color(0xFFFF8AD8).copy(0.3f), Color(0xFF5CC8FF).copy(0.3f)))))
-                if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(5.dp).alpha(0.8f), contentScale = ContentScale.Crop)
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(0.25f)))
-            }
+        Box(Modifier.matchParentSize().refractSelf(radiusPx, a)) {
+            Box(Modifier.fillMaxSize().background(Color(0xFF0B0B10)))
+            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(
+                Color(Style.accent).copy(0.5f), Color(0xFFFF8AD8).copy(0.3f), Color(0xFF5CC8FF).copy(0.3f)))))
+            if (art != null) SoftArt(art, Modifier.fillMaxSize(), 0.8f)
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(0.25f)))
         }
         Box(Modifier.matchParentSize().border(1.2.dp, Brush.linearGradient(
             listOf(Color.White.copy(0.75f), Color.White.copy(0.05f), Color.White.copy(0.4f))), shape))

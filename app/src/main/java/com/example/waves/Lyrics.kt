@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,14 +52,19 @@ fun rememberLyrics(id: String?): LyricsData {
 }
 
 @Composable
-fun rememberPosition(c: MediaController?, running: Boolean): Long {
-    var pos by remember { mutableLongStateOf(0L) }
+fun rememberPosition(c: MediaController?, running: Boolean, periodMs: Long = 200): State<Long> {
+    val pos = remember { mutableLongStateOf(0L) }
     LaunchedEffect(c, running) {
-        pos = c?.currentPosition ?: 0L
-        while (running) { delay(200); pos = c?.currentPosition ?: 0L }
+        pos.longValue = c?.currentPosition ?: 0L
+        while (running) { delay(periodMs); pos.longValue = c?.currentPosition ?: 0L }
     }
     return pos
 }
+
+/** Индекс активной строки: пересчитывается часто, но состояние меняется только при смене строки. */
+@Composable
+fun rememberActive(lines: List<LyricLine>, pos: State<Long>): State<Int> =
+    remember(lines) { derivedStateOf { activeLine(lines, pos.value) } }
 
 fun activeLine(lines: List<LyricLine>, pos: Long): Int =
     if (lines.none { it.timeMs != null }) -1
@@ -69,12 +76,19 @@ fun fmt(ms: Long) = "%d:%02d".format(ms / 60000, ms / 1000 % 60)
 fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, onClick: () -> Unit) {
     val dist = if (active < 0) 0 else abs(i - active)
     val target = if (!synced || dist == 0) 1f else (0.6f - 0.1f * dist).coerceAtLeast(0.2f)
-    val alpha by animateFloatAsState(target, tween(350), label = "a")
-    val size by animateFloatAsState(if (i == active) (if (big) 28f else 17f) else (if (big) 22f else 14f),
-        spring(stiffness = 200f), label = "s")
+    val alpha = animateFloatAsState(target, tween(350), label = "a")
+    val scale = animateFloatAsState(if (i == active || !synced) 1f else 0.84f, spring(stiffness = 250f), label = "s")
+    // Размер шрифта не меняется, анимируется только масштаб слоя: без перерасчёта текста, прокрутка плавная.
     Text(l.text.ifBlank { "♪" },
-        Modifier.fillMaxWidth().clickable(enabled = l.timeMs != null, onClick = onClick).padding(vertical = if (big) 8.dp else 4.dp),
-        color = Color.White.copy(alpha), fontSize = size.sp, lineHeight = (size * 1.25f).sp, fontWeight = FontWeight.Bold)
+        Modifier.fillMaxWidth()
+            .graphicsLayer {
+                this.alpha = alpha.value; scaleX = scale.value; scaleY = scale.value
+                transformOrigin = TransformOrigin(0f, 0.5f)
+            }
+            .clickable(enabled = l.timeMs != null, onClick = onClick)
+            .padding(vertical = if (big) 8.dp else 4.dp),
+        color = Color.White, fontSize = (if (big) 26 else 16).sp, lineHeight = (if (big) 32 else 20).sp,
+        fontWeight = FontWeight.Bold)
 }
 
 /** Экран текста: строки подсвечиваются по времени, тап по строке перематывает. */
@@ -84,11 +98,9 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
     val lyr = rememberLyrics(np.id)
     val pos = rememberPosition(c, np.playing)
     val synced = lyr.lines.any { it.timeMs != null }
-    val active = activeLine(lyr.lines, pos)
+    val active = rememberActive(lyr.lines, pos).value
     val listState = rememberLazyListState()
     LaunchedEffect(active) { if (active >= 0) listState.animateScrollToItem(active, scrollOffset = -280) }
-    val dur = (c?.duration ?: 0L).coerceAtLeast(0L)
-
     AppBackground(np.art) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -105,12 +117,7 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
                     itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, true) { c?.seekTo(l.timeMs!!) } }
                 }
             }
-            Column(Modifier.padding(horizontal = 24.dp)) {
-                Slider(if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f, { c?.seekTo((it * dur).toLong()) })
-                Row { Text(fmt(pos), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.weight(1f))
-                    Text(fmt(dur), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall) }
-            }
+            SeekBar(c, pos)
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically) {
                 val tintS by animateColorAsState(if (np.shuffle) Color(Style.accent) else Color.White, label = "sh")
@@ -121,6 +128,20 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
                     Icon(if (np.repeat == 1) Icons.Default.RepeatOne else Icons.Default.Repeat, null, tint = tintR)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SeekBar(c: MediaController?, pos: State<Long>) {
+    val p = pos.value
+    val dur = (c?.duration ?: 0L).coerceAtLeast(0L)
+    Column(Modifier.padding(horizontal = 24.dp)) {
+        Slider(if (dur > 0) (p.toFloat() / dur).coerceIn(0f, 1f) else 0f, { c?.seekTo((it * dur).toLong()) })
+        Row {
+            Text(fmt(p), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.weight(1f))
+            Text(fmt(dur), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
