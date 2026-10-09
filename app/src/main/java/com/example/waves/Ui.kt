@@ -29,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -139,11 +140,19 @@ fun OverlayPlayer(onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit)
     val c = rememberController()
     val np = rememberNowPlaying(c)
     var mode by remember { mutableStateOf(OvMode.Compact) }
-    AnimatedContent(mode == OvMode.Bubble,
-        transitionSpec = { (fadeIn(tween(220)) + scaleIn(tween(260), 0.85f)) togetherWith (fadeOut(tween(140)) + scaleOut(tween(180), 0.85f)) },
-        label = "ov") { bubble ->
-        if (bubble) { LaunchedEffect(Unit) { onZone(null) }; BubbleView(np) { mode = OvMode.Compact } }
-        else PanelView(c, np, mode == OvMode.Full, { mode = it }, onZone, onClose)
+    // без анимации размера окна: меняется один раз, плавно проявляется только содержимое
+    if (mode == OvMode.Bubble) BubbleView(np, drag) { mode = OvMode.Compact }
+    else PanelView(c, np, mode == OvMode.Full, { mode = it }, drag, onClose)
+}
+
+@Composable
+private fun Modifier.popIn(key: Any): Modifier {
+    val t = remember(key) { Animatable(0f) }
+    LaunchedEffect(key) { t.animateTo(1f, tween(150)) }
+    return this.graphicsLayer {
+        val v = t.value
+        alpha = 0.4f + 0.6f * v
+        val s = 0.94f + 0.06f * v; scaleX = s; scaleY = s
     }
 }
 
@@ -167,12 +176,12 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
     val synced = lyr.lines.any { it.timeMs != null }
     val active = rememberActive(lyr.lines, pos).value
     var tab by remember { mutableIntStateOf(0) }
-    val w by animateDpAsState(if (full) 300.dp else 230.dp, tween(240, easing = FastOutSlowInEasing), label = "w")
+    val w = if (full) 300.dp else 230.dp
     val ls = rememberLazyListState()
     LaunchedEffect(active, tab, full) { if (full && tab == 1 && active >= 0) ls.animateScrollToItem(active, -70) }
 
-    OverlaySurface(RoundedCornerShape(Style.corner.dp), Style.overlayAlpha, Modifier.width(w), np.art) {
-        Column(Modifier.padding(10.dp).animateContentSize(tween(240, easing = FastOutSlowInEasing))) {
+    OverlaySurface(RoundedCornerShape(Style.corner.dp), Style.overlayAlpha, Modifier.width(w).popIn(full), np.art) {
+        Column(Modifier.padding(10.dp)) {
             Row(Modifier.fillMaxWidth().onGloballyPositioned {
                 val b = it.boundsInRoot()
                 onZone(android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt()))
@@ -199,7 +208,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
             if (full) {
                 Pill(listOf("Очередь", "Текст"), tab, { tab = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Controls(c, np.playing) }
-                Crossfade(tab, animationSpec = tween(250), label = "tab") { t ->
+                tab.let { t ->
                     if (t == 0) {
                         if (c != null) LazyColumn(Modifier.height(200.dp)) {
                             items(c.mediaItemCount) { i ->

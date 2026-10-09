@@ -88,7 +88,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val cv = ComposeView(this).apply {
             setContent {
                 LaunchedEffect(Style.blurBehind) {
-                    if (android.os.Build.VERSION.SDK_INT >= 31) {
+                    if (android.os.Build.VERSION.SDK_INT >= 31 &&
+                        Style.blurBehind != ((lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND) != 0)) {
                         if (Style.blurBehind) { lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; lp.blurBehindRadius = 40 }
                         else { lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv(); lp.blurBehindRadius = 0 }
                         root?.let { wm.updateViewLayout(it, lp) }
