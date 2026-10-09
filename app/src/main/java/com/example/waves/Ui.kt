@@ -141,8 +141,10 @@ fun OverlayPlayer(onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit)
     val np = rememberNowPlaying(c)
     var mode by remember { mutableStateOf(OvMode.Compact) }
     // без анимации размера окна: меняется один раз, плавно проявляется только содержимое
-    if (mode == OvMode.Bubble) BubbleView(np, drag) { mode = OvMode.Compact }
-    else PanelView(c, np, mode == OvMode.Full, { mode = it }, drag, onClose)
+    // у пузырька тянуть можно за всё окно
+    LaunchedEffect(mode) { if (mode == OvMode.Bubble) onZone(null) }
+    if (mode == OvMode.Bubble) BubbleView(np) { mode = OvMode.Compact }
+    else PanelView(c, np, mode == OvMode.Full, { mode = it }, onZone, onClose)
 }
 
 @Composable
@@ -161,7 +163,7 @@ private fun BubbleView(np: NowPlaying, onTap: () -> Unit) {
     val rot by rememberInfiniteTransition(label = "r").animateFloat(0f, 360f,
         infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "rot")
     OverlaySurface(CircleShape, Style.overlayAlpha,
-        Modifier.size(60.dp).pointerInput(Unit) { detectTapGestures { onTap() } }, np.art, 1000f) {
+        Modifier.size(60.dp).popIn(0).pointerInput(Unit) { detectTapGestures { onTap() } }, np.art, 1000f) {
         Box(Modifier.align(Alignment.Center).size(46.dp).rotate(if (np.playing) rot else 0f)
             .clip(CircleShape).background(Color(0x33FFFFFF))) {
             AsyncImage(np.art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
