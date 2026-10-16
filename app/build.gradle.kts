@@ -6,10 +6,10 @@ plugins {
 android {
     namespace = "com.example.waves"
     compileSdk = 35
-    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 7; versionName = "0.7"; ndk { abiFilters += listOf("arm64-v8a") } }
+    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 8; versionName = "0.8"; ndk { abiFilters += listOf("arm64-v8a") } }
     signingConfigs { getByName("debug") { storeFile = file("debug.keystore"); storePassword = "android"; keyAlias = "androiddebugkey"; keyPassword = "android" } }
     buildFeatures { compose = true }
-    packaging { jniLibs { useLegacyPackaging = true } }
+    packaging { jniLibs { useLegacyPackaging = true; pickFirsts += listOf("**/libc++_shared.so") } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
@@ -25,4 +25,5 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.alphacephei:vosk-android:0.3.47") { exclude(group = "net.java.dev.jna") }
     implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation(files("libs/sherpa-onnx.aar"))   // скачивается workflow из релизов sherpa-onnx
 }

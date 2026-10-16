@@ -48,6 +48,7 @@ object Style {
     var ovEq by mutableStateOf(true)
     var ovLyric by mutableStateOf(true)
     var ovStart by mutableIntStateOf(1)        // 0 пузырёк, 1 компактный, 2 полный
+    var asrEngine by mutableIntStateOf(1)      // 0 Vosk, 1 GigaAM
     var subsEnabled by mutableStateOf(false)   // распознавание текста (Vosk)
     var blurBehind by mutableStateOf(false)   // эксперимент, по умолчанию выключено
 
@@ -57,11 +58,11 @@ object Style {
         theme = s.getInt("theme", 0); accent = s.getInt("accent", accent); glass = s.getFloat("glass", glass)
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
-        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false)
+        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
-            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.apply()
+            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)?.apply()
     }
 }
 

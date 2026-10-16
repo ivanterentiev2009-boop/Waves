@@ -12,6 +12,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
+import java.io.ByteArrayOutputStream
+import kotlin.math.abs
 import org.vosk.Model
 import org.vosk.Recognizer
 import java.io.File
@@ -46,6 +52,11 @@ object Transcriber {
     var modelProgress by mutableFloatStateOf(0f)
     var modelStage by mutableStateOf("")
     val logs = mutableStateListOf<String>()
+    var gigaReady by mutableStateOf(false)
+    var gigaBusy by mutableStateOf(false)
+    var gigaProgress by mutableFloatStateOf(0f)
+    var gigaStage by mutableStateOf("")
+    var gigaError by mutableStateOf<String?>(null)
     var modelError by mutableStateOf<String?>(null)
     var catalog by mutableStateOf<List<VoskModel>>(emptyList())
     var catalogLoading by mutableStateOf(false)
@@ -61,6 +72,7 @@ object Transcriber {
         installed.clear(); installed.addAll(names)
         if (activeModel !in names) { activeModel = names.firstOrNull() ?: ""; sp?.edit()?.putString("active", activeModel)?.apply() }
         modelReady = activeModel.isNotEmpty()
+        refreshGiga(ctx)
     }
 
     fun select(ctx: Context, name: String) { refresh(ctx); activeModel = name; sp?.edit()?.putString("active", name)?.apply(); modelReady = true }
@@ -175,6 +187,150 @@ object Transcriber {
         }
     }
 
+    // ---------------- GigaAM (sherpa-onnx) ----------------
+    private const val GIGA_BASE = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-transducer-giga-am-russian-2024-10-24/resolve/main/"
+    private val GIGA_FILES = listOf("encoder.int8.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt")
+    private val GIGA_WEIGHTS = listOf(0.97f, 0.015f, 0.01f, 0.005f)
+    private fun gigaDir(ctx: Context) = File(ctx.filesDir, "gigaam")
+
+    fun refreshGiga(ctx: Context) {
+        gigaReady = GIGA_FILES.all { n -> File(gigaDir(ctx), n).let { it.isFile && it.length() > 0 } }
+    }
+
+    fun deleteGiga(ctx: Context) { gigaDir(ctx).deleteRecursively(); refreshGiga(ctx) }
+
+    fun downloadGiga(ctx: Context) {
+        if (gigaBusy) return
+        val app = ctx.applicationContext
+        gigaBusy = true; gigaError = null; gigaProgress = 0f; gigaStage = "Подключение…"
+        scope.launch {
+            try {
+                val dir = gigaDir(app).apply { mkdirs() }
+                var base = 0f
+                GIGA_FILES.forEachIndexed { i, name ->
+                    val dest = File(dir, name)
+                    if (!(dest.isFile && dest.length() > 0)) {
+                        gigaStage = "Скачивание $name"
+                        fetchFile(GIGA_BASE + name, dest) { f ->
+                            gigaProgress = base + GIGA_WEIGHTS[i] * f
+                            gigaStage = "Скачивание $name ${(f * 100).toInt()}%"
+                        }
+                    }
+                    base += GIGA_WEIGHTS[i]; gigaProgress = base
+                }
+                gigaStage = "Готово"; refreshGiga(app)
+            } catch (e: Throwable) { gigaError = "Ошибка: ${e::class.simpleName}: ${e.message}" }
+            gigaBusy = false
+        }
+    }
+
+    /** Скачивание файла с проверкой размера и докачкой при обрыве. */
+    private suspend fun fetchFile(url: String, dest: File, onFrac: (Float) -> Unit) {
+        val part = File(dest.path + ".part"); part.delete()
+        var done = 0L; var total = -1L; var fails = 0
+        while (total < 0 || done < total) {
+            val c = URL(url).openConnection() as HttpURLConnection
+            c.connectTimeout = 20000; c.readTimeout = 30000
+            c.setRequestProperty("Accept-Encoding", "identity")
+            if (done > 0) c.setRequestProperty("Range", "bytes=$done-")
+            val code = c.responseCode
+            if (code !in 200..299) throw IOException("HTTP $code")
+            if (done > 0 && code != 206) { done = 0; part.delete() }
+            if (total < 0) total = if (code == 206) (c.getHeaderField("Content-Range")?.substringAfter('/')?.toLongOrNull() ?: -1L) else c.contentLengthLong
+            try {
+                c.inputStream.use { inp ->
+                    FileOutputStream(part, done > 0).use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = inp.read(buf); if (n < 0) break
+                            out.write(buf, 0, n); done += n
+                            if (total > 0) onFrac(done.toFloat() / total)
+                        }
+                    }
+                }
+            } catch (e: IOException) {
+                if (++fails > 15) throw e
+                delay(2000); continue
+            }
+            if (total > 0 && done < total) {
+                if (++fails > 15) throw IOException("загрузка оборвалась на ${done * 100 / total}%")
+                delay(1500)
+            } else if (total <= 0) break
+        }
+        if (!part.renameTo(dest)) throw IOException("не удалось сохранить ${dest.name}")
+    }
+
+    /** Токены и время токенов -> слова с временем (текст сопоставляется с токенами по символам). */
+    private fun wordsFrom(toks: Array<String>, times: FloatArray, text: String, offset: Float): List<Triple<String, Long, Long>> {
+        val chars = ArrayList<Pair<Char, Int>>()
+        toks.forEachIndexed { i, tok -> for (ch in tok.replace("▁", "")) if (!ch.isWhitespace()) chars.add(ch to i) }
+        val out = mutableListOf<Triple<String, Long, Long>>()
+        var pos = 0
+        for (word in text.split(" ").filter { it.isNotBlank() }) {
+            val idx = ArrayList<Int>()
+            for (ch in word) {
+                while (pos < chars.size && chars[pos].first != ch) pos++
+                if (pos < chars.size) { idx.add(chars[pos].second); pos++ }
+            }
+            if (idx.isNotEmpty() && idx.first() < times.size) {
+                val s = times[idx.first()]
+                val last = minOf(idx.last(), times.size - 1)
+                val e = if (last + 1 < times.size) times[last + 1] else times[last] + 0.2f
+                val sMs = ((s + offset) * 1000).toLong()
+                out += Triple(word, sMs, maxOf(((e + offset) * 1000).toLong(), sMs + 80))
+            }
+        }
+        return out
+    }
+
+    /** GigaAM: трек режется на куски по ~25 с в самых тихих местах, чтобы не резать слова и не раздувать память. */
+    private fun transcribeGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> {
+        val dir = gigaDir(ctx)
+        val cfg = OfflineRecognizerConfig(
+            modelConfig = OfflineModelConfig(
+                transducer = OfflineTransducerModelConfig(
+                    encoder = File(dir, "encoder.int8.onnx").path,
+                    decoder = File(dir, "decoder.onnx").path,
+                    joiner = File(dir, "joiner.onnx").path),
+                tokens = File(dir, "tokens.txt").path,
+                numThreads = 4,
+                modelType = "nemo_transducer"))
+        val pcm = ByteArrayOutputStream()
+        decode(ctx, uri, { b, n -> pcm.write(b, 0, n) }) { onProgress(it * 0.25f) }
+        val bytes = pcm.toByteArray()
+        val samples = FloatArray(bytes.size / 2) { i -> ((bytes[2 * i + 1].toInt() shl 8) or (bytes[2 * i].toInt() and 0xFF)).toShort() / 32768f }
+        val sr = 16000; val target = 25 * sr; val frame = sr / 10
+        val rec = OfflineRecognizer(config = cfg)
+        val words = mutableListOf<Triple<String, Long, Long>>()
+        try {
+            var start = 0
+            while (start < samples.size) {
+                var end = minOf(start + target, samples.size)
+                if (samples.size - start > target + 5 * sr) {
+                    var best = end; var bestE = Float.MAX_VALUE
+                    var p = start + 20 * sr
+                    val hi = minOf(start + 28 * sr, samples.size)
+                    while (p + frame <= hi) {
+                        var e = 0f
+                        for (k in p until p + frame) e += abs(samples[k])
+                        if (e < bestE) { bestE = e; best = p + frame / 2 }
+                        p += frame / 2
+                    }
+                    end = best
+                }
+                val stream = rec.createStream()
+                stream.acceptWaveform(samples.copyOfRange(start, end), sr)
+                rec.decode(stream)
+                val r = rec.getResult(stream)
+                stream.release()
+                words += wordsFrom(r.tokens, r.timestamps, r.text, start / sr.toFloat())
+                start = end
+                onProgress(0.25f + 0.75f * start / samples.size)
+            }
+        } finally { rec.release() }
+        return group(words)
+    }
+
     private fun file(ctx: Context, id: String) = File(File(ctx.filesDir, "subs").apply { mkdirs() }, "$id.json")
 
     fun load(ctx: Context, id: String): List<LyricLine>? {
@@ -236,12 +392,13 @@ object Transcriber {
     }
 
     fun start(ctx: Context, id: String, uri: Uri) {
-        if (progress.containsKey(id) || !modelReady) return
+        val giga = Style.asrEngine == 1
+        if (progress.containsKey(id) || !(if (giga) gigaReady else modelReady)) return
         val app = ctx.applicationContext
         errors.remove(id); progress[id] = 0f
         scope.launch {
             try {
-                val lines = transcribe(app, uri) { progress[id] = it }
+                val lines = if (giga) transcribeGiga(app, uri) { progress[id] = it } else transcribe(app, uri) { progress[id] = it }
                 if (lines.isEmpty()) throw IOException("речь не найдена")
                 save(app, id, lines)
                 version++

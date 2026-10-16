@@ -242,8 +242,13 @@ private fun EmptyLyrics(status: String, np: NowPlaying) {
                     LinearProgressIndicator({ p }, Modifier.fillMaxWidth())
                     Text("Распознавание… ${(p * 100).toInt()}%", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
                 }
-                !Transcriber.modelReady -> Button({ Transcriber.downloadModel(ctx) }, enabled = !Transcriber.modelBusy) {
-                    Text(if (Transcriber.modelBusy) "Скачивание ${(Transcriber.modelProgress * 100).toInt()}%" else "Скачать модель (около 45 МБ)")
+                !(if (Style.asrEngine == 1) Transcriber.gigaReady else Transcriber.modelReady) -> {
+                    val giga = Style.asrEngine == 1
+                    val busy = if (giga) Transcriber.gigaBusy else Transcriber.modelBusy
+                    val prog = if (giga) Transcriber.gigaProgress else Transcriber.modelProgress
+                    Button({ if (giga) Transcriber.downloadGiga(ctx) else Transcriber.downloadModel(ctx) }, enabled = !busy) {
+                        Text(if (busy) "Скачивание ${(prog * 100).toInt()}%" else if (giga) "Скачать GigaAM (около 285 МБ)" else "Скачать модель (около 45 МБ)")
+                    }
                 }
                 else -> Button({ np.uri?.let { Transcriber.start(ctx, id, it) } }, enabled = np.uri != null) { Text("Распознать текст") }
             }

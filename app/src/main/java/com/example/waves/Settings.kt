@@ -76,6 +76,22 @@ fun SettingsScreen(onBack: () -> Unit) {
                     "Исправить текст можно долгим нажатием на строку, а готовый .lrc загрузить кнопкой на экране текста.",
                     color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
                 if (Style.subsEnabled) {
+                    Pill(listOf("Vosk", "GigaAM"), Style.asrEngine, { Style.asrEngine = it; Style.save() })
+                }
+                if (Style.subsEnabled && Style.asrEngine == 1) {
+                    Text("GigaAM (Сбер): для русского заметно точнее Vosk, слова подсвечиваются по точному времени. Модель около 285 МБ. " +
+                        "Лицензия модели некоммерческая: только для личного использования.",
+                        color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    Text(if (Transcriber.gigaReady) "Модель установлена" else "Модель не скачана", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    if (Transcriber.gigaBusy) {
+                        Text(Transcriber.gigaStage, color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        LinearProgressIndicator({ Transcriber.gigaProgress }, Modifier.fillMaxWidth())
+                    }
+                    Transcriber.gigaError?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+                    if (!Transcriber.gigaReady) Button({ Transcriber.downloadGiga(ctx) }, enabled = !Transcriber.gigaBusy) { Text("Скачать GigaAM") }
+                    else TextButton({ Transcriber.deleteGiga(ctx) }) { Text("Удалить модель") }
+                }
+                if (Style.subsEnabled && Style.asrEngine == 0) {
                     Text("Активная модель: " + Transcriber.activeModel.ifBlank { "не выбрана" }, color = Color.White, style = MaterialTheme.typography.bodySmall)
                     if (Transcriber.modelBusy) {
                         Text("${Transcriber.modelName}: ${Transcriber.modelStage}", color = Color.White, style = MaterialTheme.typography.bodySmall)
