@@ -45,30 +45,34 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-object LyricsCache { val map = HashMap<String, List<LyricLine>>() }
-class LyricsData(val lines: List<LyricLine>, val status: String)
+object LyricsCache { val map = HashMap<String, Pair<String, List<LyricLine>>>() }
+class LyricsData(val lines: List<LyricLine>, val status: String, val source: String = "")
 
 @Composable
-fun rememberLyrics(id: String?): LyricsData {
+fun rememberLyrics(id: String?, title: String?, artist: String?, c: MediaController?): LyricsData {
     val ctx = LocalContext.current
     var data by remember(id) { mutableStateOf(LyricsData(emptyList(), "Загрузка…")) }
-    LaunchedEffect(id, Transcriber.version) {
+    LaunchedEffect(id, title, Transcriber.version, Style.lyYandex, Style.lyLrclib, Style.lyOvh) {
         if (id == null) { data = LyricsData(emptyList(), "Ничего не играет"); return@LaunchedEffect }
-        // свои правки, загруженный .lrc или распознанный текст важнее всего остального
+        // свои правки, загруженный файл или распознанный текст важнее всего остального
         val saved = withContext(Dispatchers.IO) { Transcriber.load(ctx, id) }
-        if (saved != null && saved.isNotEmpty()) { data = LyricsData(saved, ""); return@LaunchedEffect }
-        if (!id.startsWith("ym")) {
-            data = LyricsData(emptyList(), if (Style.subsEnabled) "Текста нет. Его можно распознать на устройстве или загрузить .lrc кнопкой сверху."
-                else "Текста нет. Загрузи .lrc кнопкой сверху или включи распознавание: Стиль → Субтитры.")
-            return@LaunchedEffect
+        if (saved != null && saved.isNotEmpty()) { data = LyricsData(saved, "", "мои правки / файл"); return@LaunchedEffect }
+        LyricsCache.map[id]?.let { (src, l) -> if (l.isNotEmpty()) { data = LyricsData(l, "", src); return@LaunchedEffect } }
+        data = LyricsData(emptyList(), "Ищем текст…")
+        // длительность нужна для точного поиска, ждём её не дольше секунды
+        var durMs = c?.duration ?: -1L
+        var tries = 0
+        while (c != null && durMs <= 0 && tries < 10) { delay(100); durMs = c.duration; tries++ }
+        val durSec = if (durMs > 0) (durMs / 1000).toInt() else null
+        val notes = mutableListOf<String>()
+        val found = withContext(Dispatchers.IO) { LyricSources.find(id, title, artist, durSec, notes) }
+        if (found != null) {
+            LyricsCache.map[id] = found
+            data = LyricsData(found.second, "", found.first)
+        } else {
+            val hint = if (id.startsWith("ym")) "" else "\nМожно загрузить .lrc кнопкой сверху или распознать текст на устройстве."
+            data = LyricsData(emptyList(), (notes.joinToString("\n").ifBlank { "Текст не найден" }) + hint)
         }
-        val none = "Для этого трека текста нет"
-        LyricsCache.map[id]?.let { data = LyricsData(it, if (it.isEmpty()) none else ""); return@LaunchedEffect }
-        try {
-            val l = withContext(Dispatchers.IO) { YandexApi.lyrics(id.removePrefix("ym")) }
-            LyricsCache.map[id] = l
-            data = LyricsData(l, if (l.isEmpty()) none else "")
-        } catch (e: Exception) { data = LyricsData(emptyList(), "Ошибка: ${e.message}") }
     }
     return data
 }
@@ -155,7 +159,7 @@ fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, p
 @Composable
 fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val lyr = rememberLyrics(np.id)
+    val lyr = rememberLyrics(np.id, np.title, np.artist, c)
     val pos = rememberPosition(c, np.playing, 80)
     val synced = lyr.lines.any { it.timeMs != null }
     val active = rememberActive(lyr.lines, pos).value
@@ -189,6 +193,7 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(np.title ?: "", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(np.artist ?: "", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    if (lyr.source.isNotEmpty()) Text("Источник: ${lyr.source}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton({ picker.launch(arrayOf("*/*")) }) { Icon(Icons.Default.UploadFile, null, tint = Color.White) }
             }

@@ -72,7 +72,7 @@ fun Home(onSettings: () -> Unit) {
                 Wave.active = false
                 c?.run { setMediaItems(list.map { it.toMediaItem() }, i, 0); prepare(); play() }
             }
-            if (tab == 0) YandexTab(np, startPlay, Modifier.weight(1f))
+            if (tab == 0) YandexTab(c, np, startPlay, Modifier.weight(1f))
             else {
                 Text("Музыка на устройстве", Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = Color(0xB3FFFFFF),
                     style = MaterialTheme.typography.titleMedium)

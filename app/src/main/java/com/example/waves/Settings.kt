@@ -70,6 +70,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             Card("Плотность оверлея") {
                 Slider(Style.overlayAlpha, { Style.overlayAlpha = it }, valueRange = 0.3f..1f, onValueChangeFinished = Style::save)
             }
+            Card("Источники текстов") {
+                Text("Если в одном нет текста, приложение пробует следующий. Для любых треков, в том числе локальных.",
+                    color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
+                SwitchRow("Яндекс Музыка (для её треков)", Style.lyYandex) { Style.lyYandex = it; Style.save() }
+                SwitchRow("LRCLIB (открытая база, есть таймкоды)", Style.lyLrclib) { Style.lyLrclib = it; Style.save() }
+                SwitchRow("lyrics.ovh (только обычный текст)", Style.lyOvh) { Style.lyOvh = it; Style.save() }
+            }
             Card("Субтитры (Vosk)") {
                 SwitchRow("Распознавать текст песен на устройстве", Style.subsEnabled) { Style.subsEnabled = it; Style.save() }
                 Text("Для локальных треков без текста. Работает офлайн; точность зависит от модели и музыки. " +

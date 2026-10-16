@@ -181,7 +181,7 @@ private fun BubbleView(np: NowPlaying, onTap: () -> Unit) {
 
 @Composable
 private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMode: (OvMode) -> Unit, onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit) {
-    val lyr = rememberLyrics(np.id)
+    val lyr = rememberLyrics(np.id, np.title, np.artist, c)
     var tab by remember { mutableIntStateOf(0) }
     val pos = rememberPosition(c, np.playing && lyr.lines.isNotEmpty(), if (full && tab == 1) 80 else 250)
     val synced = lyr.lines.any { it.timeMs != null }

@@ -11,6 +11,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,7 +74,7 @@ fun WaveFeeder(c: MediaController?, np: NowPlaying) {
 }
 
 @Composable
-fun YandexTab(np: NowPlaying, onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
+fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -131,20 +135,30 @@ fun YandexTab(np: NowPlaying, onPlay: (List<Track>, Int) -> Unit, modifier: Modi
             status?.let { Text(it, Modifier.padding(16.dp, 4.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
             when (YState.section) {
                 0 -> {
-                    Column(Modifier.padding(16.dp).fillMaxWidth().panel(RoundedCornerShape(Style.corner.dp), refract = true).padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Моя волна", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-                        Text("Бесконечная подборка треков по твоим вкусам. Новые подгружаются сами.", color = Color(0xB3FFFFFF),
-                            style = MaterialTheme.typography.bodySmall)
-                        if (Wave.active) {
-                            Text("Волна играет", color = Color(Style.accent))
-                            TextButton({ Wave.active = false }) { Text("Остановить подборку") }
-                        } else Button({ startWave() }, enabled = !loading) {
-                            Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Запустить волну")
-                        }
+                    val idx = YState.wave.indexOfFirst { it.id == cur }
+                    val upcoming = (if (Wave.active && idx >= 0) YState.wave.drop(idx + 1) else YState.wave).take(12)
+                    fun playAt(track: Track) {
+                        val i = YState.wave.indexOfFirst { it.id == track.id }
+                        if (i >= 0) { onPlay(YState.wave, i); Wave.active = true }
                     }
-                    if (YState.wave.isNotEmpty()) TrackList(YState.wave, -1, { i -> onPlay(YState.wave, i); Wave.active = true },
-                        Modifier.weight(1f), currentId = cur)
+                    LazyColumn(Modifier.weight(1f)) {
+                        item {
+                            WaveHero(np, Wave.active, loading,
+                                onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() },
+                                onStop = { Wave.active = false })
+                        }
+                        if (upcoming.isNotEmpty()) {
+                            item { Text("Дальше в волне", Modifier.padding(start = 20.dp, top = 8.dp, bottom = 10.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            item {
+                                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items(upcoming, key = { it.id }) { tr -> WaveCard(tr) { playAt(tr) } }
+                                }
+                            }
+                            item { Text("Все треки волны", Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            itemsIndexed(YState.wave, key = { _, tr -> tr.id }) { _, tr -> TrackRow(tr, tr.id == cur) { playAt(tr) } }
+                        }
+                        item { Spacer(Modifier.height(16.dp)) }
+                    }
                 }
                 1 -> {
                     OutlinedTextField(YState.query, { YState.query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true,
