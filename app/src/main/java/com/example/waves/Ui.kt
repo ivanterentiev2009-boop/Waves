@@ -99,10 +99,12 @@ fun Pill(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier
 }
 
 @Composable
-fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifier: Modifier = Modifier,
+              currentId: String? = null, footer: (@Composable () -> Unit)? = null) {
     LazyColumn(modifier, contentPadding = PaddingValues(12.dp, 4.dp, 12.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         itemsIndexed(tracks, key = { _, t -> t.id }) { i, t ->
-            val bg by animateColorAsState(if (i == current) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(300), label = "rb")
+            val sel = if (currentId != null) t.id == currentId else i == current
+            val bg by animateColorAsState(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(300), label = "rb")
             Row(Modifier.animateItem().fillMaxWidth().clip(RoundedCornerShape((Style.corner * 0.7f).dp))
                 .background(bg).clickable { onClick(i) }.padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
@@ -111,9 +113,10 @@ fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifie
                     Text(t.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(t.artist, color = dim, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (i == current) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
+                if (sel) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
             }
         }
+        footer?.let { f -> item { f() } }
     }
 }
 

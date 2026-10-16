@@ -56,7 +56,7 @@ object YandexApi {
     private fun json(url: String, post: String? = null) = JSONObject(request(url, post))
 
     private fun parse(o: JSONObject): Track {
-        val id = o.get("id").toString()
+        val id = o.get("id").toString().substringBefore(":")
         val artists = o.optJSONArray("artists")
         val names = (0 until (artists?.length() ?: 0)).joinToString(", ") { artists!!.getJSONObject(it).optString("name") }
         val cover = o.optString("coverUri").takeIf { it.isNotBlank() }?.let { Uri.parse("https://" + it.replace("%%", "400x400")) }
@@ -75,10 +75,17 @@ object YandexApi {
         return details((0 until minOf(arr.length(), 300)).map { arr.getJSONObject(it).get("id").toString() })
     }
 
-    fun search(q: String): List<Track> {
-        val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=track&page=0")
+    fun search(q: String, page: Int = 0): List<Track> {
+        val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=track&page=$page")
             .getJSONObject("result").optJSONObject("tracks")?.optJSONArray("results") ?: return emptyList()
-        return (0 until res.length()).map { parse(res.getJSONObject(it)) }
+        return (0 until res.length()).map { parse(res.getJSONObject(it)) }.distinctBy { it.id }
+    }
+
+    /** «Моя волна»: бесконечная подборка. afterId — последний трек очереди, чтобы получить продолжение. */
+    fun wave(afterId: String? = null): List<Track> {
+        val q = if (afterId != null) "&queue=$afterId" else ""
+        val seq = json("$BASE/rotor/station/user:onyourwave/tracks?settings2=true$q").getJSONObject("result").getJSONArray("sequence")
+        return (0 until seq.length()).mapNotNull { i -> seq.getJSONObject(i).optJSONObject("track")?.let { parse(it) } }.distinctBy { it.id }
     }
 
     /** Блокирующий вызов: вызывается из загрузчика ExoPlayer (не из UI-потока). */

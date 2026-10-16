@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -50,11 +52,15 @@ fun Home(onSettings: () -> Unit) {
     }
     var tab by remember { mutableIntStateOf(0) }
     var showLyrics by remember { mutableStateOf(false) }
+    WaveFeeder(c, np)
     Crossfade(showLyrics, animationSpec = tween(350), label = "screen") { lyr ->
     if (lyr) LyricsScreen(c, np) { showLyrics = false } else AppBackground(np.art) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(20.dp, 16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Waves", Modifier.weight(1f), style = MaterialTheme.typography.headlineLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Light, color = Color.White)
+                IconButton({ tab = if (tab == 0) 1 else 0 }) {
+                    Icon(if (tab == 0) Icons.Default.PhoneAndroid else Icons.Default.Cloud, null, tint = Color.White)
+                }
                 IconButton(onSettings) { Icon(Icons.Default.Tune, null, tint = Color.White) }
                 FilledTonalButton({
                     if (Settings.canDrawOverlays(ctx)) ctx.startForegroundService(Intent(ctx, OverlayService::class.java))
@@ -62,12 +68,16 @@ fun Home(onSettings: () -> Unit) {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }) { Icon(Icons.Default.PictureInPicture, null); Spacer(Modifier.width(6.dp)); Text("Оверлей") }
             }
-            Pill(listOf("Устройство", "Яндекс Музыка"), tab, { tab = it }, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             val startPlay: (List<Track>, Int) -> Unit = { list, i ->
+                Wave.active = false
                 c?.run { setMediaItems(list.map { it.toMediaItem() }, i, 0); prepare(); play() }
             }
-            if (tab == 0) TrackList(tracks, np.index, { i -> startPlay(tracks, i) }, Modifier.weight(1f))
-            else YandexTab(np.index, startPlay, Modifier.weight(1f))
+            if (tab == 0) YandexTab(np, startPlay, Modifier.weight(1f))
+            else {
+                Text("Музыка на устройстве", Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = Color(0xB3FFFFFF),
+                    style = MaterialTheme.typography.titleMedium)
+                TrackList(tracks, np.index, { i -> startPlay(tracks, i) }, Modifier.weight(1f), currentId = np.id ?: "")
+            }
             Box(Modifier.navigationBarsPadding()) {
                 Column {
                     Equalizer(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 20.dp), np.playing)
