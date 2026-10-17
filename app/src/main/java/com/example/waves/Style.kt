@@ -47,7 +47,7 @@ object Style {
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
-    const val BUILD = "r10"
+    const val BUILD = "r11"
     var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
     var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var ovScale by mutableFloatStateOf(1f)     // редактор оверлея
@@ -266,6 +266,7 @@ fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = fals
     if (Style.theme != 3 || haze == null) { Box(modifier.panel(shape, refract = refract), content = content); return }
     Box(modifier.clip(shape)
         .hazeEffect(haze) {
+            backgroundColor = Color(0xFF1B1B22)
             blurRadius = 28.dp
             tints = listOf(HazeTint(Color.White.copy(0.08f + Style.glass * 0.20f)))
             noiseFactor = 0.04f
