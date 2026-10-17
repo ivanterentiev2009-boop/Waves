@@ -25,10 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -51,13 +48,6 @@ object Style {
     var ovEq by mutableStateOf(true)
     var ovLyric by mutableStateOf(true)
     var ovStart by mutableIntStateOf(1)        // 0 пузырёк, 1 компактный, 2 полный
-    var layout by mutableIntStateOf(1)          // 0 классический, 1 как в стриминговых приложениях
-    var bgArt by mutableStateOf<Uri?>(null)     // обложка на фоне (для размытия под панелями)
-    var waveStyle by mutableIntStateOf(0)       // вид «Моей волны»
-    var lyYandex by mutableStateOf(true)      // источники текстов
-    var lyLrclib by mutableStateOf(true)
-    var lyOvh by mutableStateOf(true)
-    var asrEngine by mutableIntStateOf(1)      // 0 Vosk, 1 GigaAM
     var subsEnabled by mutableStateOf(false)   // распознавание текста (Vosk)
     var blurBehind by mutableStateOf(false)   // эксперимент, по умолчанию выключено
 
@@ -67,13 +57,11 @@ object Style {
         theme = s.getInt("theme", 0); accent = s.getInt("accent", accent); glass = s.getFloat("glass", glass)
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
-        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
-        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws", 0); layout = s.getInt("lay", 1)
+        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
-            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)
-            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws", waveStyle)?.putInt("lay", layout)?.apply()
+            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.apply()
     }
 }
 
@@ -158,16 +146,12 @@ fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false)
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(0.55f), Color.White.copy(0.04f), Color.White.copy(0.25f))), shape)
         1 -> this.clip(shape).background(Color(0xFF17171C).copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.07f), shape)
-        3 -> this.clip(shape)          // матовое стекло: ровная приглушённая панель, без бликов и градиентов
-            .background(Color(0xFF1B1B22).copy(alpha = ((0.50f + Style.glass * 0.6f).coerceAtMost(0.9f)) * strength))
-            .border(1.dp, Color.White.copy(0.06f), shape)
         else -> this.clip(shape).background(Color.Black.copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.10f), shape)
     }
 
 @Composable
 fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
-    SideEffect { Style.bgArt = art }
     val base = when (Style.theme) { 2 -> Color.Black; 1 -> Color(0xFF0B0B0E); else -> Color(0xFF08080D) }
     Box(Modifier.fillMaxSize().background(base)) {
         if (Style.theme == 0) {
@@ -178,12 +162,6 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.30f), Color.Transparent), Offset(900f, 1500f), 900f)))
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.28f), Color.Transparent), Offset(100f, 2000f), 900f)))
                 if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 5.dp else 70.dp).alpha(if (glassCapable) 0.85f else 0.5f), contentScale = ContentScale.Crop)
-            }
-        } else if (Style.theme == 3) {
-            MatteBackdrop(art, 16.dp, Modifier.fillMaxSize())
-            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                val rnd = kotlin.random.Random(3)
-                repeat(500) { drawCircle(Color.White.copy(0.03f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
             }
         }
         content()
@@ -228,42 +206,6 @@ fun OverlaySurface(shape: Shape, strength: Float, modifier: Modifier, art: Uri?,
         }
         Box(Modifier.matchParentSize().border(1.2.dp, Brush.linearGradient(
             listOf(Color.White.copy(0.75f), Color.White.copy(0.05f), Color.White.copy(0.4f))), shape))
-        content()
-    }
-}
-
-/** Фон матового стекла: мягкий градиент и размытая обложка. */
-@Composable
-fun MatteBackdrop(art: Uri?, artBlur: androidx.compose.ui.unit.Dp, modifier: Modifier) {
-    val tint = lerp(Color(Style.accent), Color.Black, 0.65f)
-    Box(modifier) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF111116)))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint.copy(0.55f), Color(0xFF111116), tint.copy(0.30f)))))
-        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.45f), contentScale = ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.25f)))
-    }
-}
-
-/**
- * Панель. В теме «Матовое стекло» под ней настоящее размытие фона: рисуется тот же фон, сильно размытый и
- * сдвинутый ровно так, чтобы совпасть с положением панели. В остальных темах обычная панель.
- * Использовать для неподвижных панелей (плеер, нижняя панель), в прокручиваемых списках дорого.
- */
-@Composable
-fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = false, content: @Composable BoxScope.() -> Unit) {
-    if (Style.theme != 3 || Build.VERSION.SDK_INT < 31) { Box(modifier.panel(shape, refract = refract), content = content); return }
-    val pos = remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
-    val view = androidx.compose.ui.platform.LocalView.current; val win = androidx.compose.ui.unit.IntSize(view.width, view.height)
-    val backdrop = Modifier.layout { m, _ ->
-        val p = m.measure(androidx.compose.ui.unit.Constraints.fixed(win.width, win.height))
-        layout(0, 0) { p.place(-pos.value.x, -pos.value.y) }
-    }
-    Box(modifier.onGloballyPositioned {
-        val o = it.positionInRoot()
-        pos.value = androidx.compose.ui.unit.IntOffset(o.x.toInt(), o.y.toInt())
-    }.clip(shape).border(1.dp, Color.White.copy(0.10f), shape)) {
-        MatteBackdrop(Style.bgArt, 55.dp, backdrop)
-        Box(Modifier.matchParentSize().background(Color.White.copy(0.06f + Style.glass * 0.25f)))
         content()
     }
 }

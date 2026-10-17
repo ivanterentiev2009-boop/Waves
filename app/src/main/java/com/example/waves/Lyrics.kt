@@ -5,12 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.filled.UploadFile
-import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -45,34 +40,29 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-object LyricsCache { val map = HashMap<String, Pair<String, List<LyricLine>>>() }
-class LyricsData(val lines: List<LyricLine>, val status: String, val source: String = "")
+object LyricsCache { val map = HashMap<String, List<LyricLine>>() }
+class LyricsData(val lines: List<LyricLine>, val status: String)
 
 @Composable
-fun rememberLyrics(id: String?, title: String?, artist: String?, c: MediaController?): LyricsData {
+fun rememberLyrics(id: String?): LyricsData {
     val ctx = LocalContext.current
     var data by remember(id) { mutableStateOf(LyricsData(emptyList(), "Загрузка…")) }
-    LaunchedEffect(id, title, Transcriber.version, Style.lyYandex, Style.lyLrclib, Style.lyOvh) {
+    LaunchedEffect(id, Transcriber.version) {
         if (id == null) { data = LyricsData(emptyList(), "Ничего не играет"); return@LaunchedEffect }
-        // свои правки, загруженный файл или распознанный текст важнее всего остального
-        val saved = withContext(Dispatchers.IO) { Transcriber.load(ctx, id) }
-        if (saved != null && saved.isNotEmpty()) { data = LyricsData(saved, "", "мои правки / файл"); return@LaunchedEffect }
-        LyricsCache.map[id]?.let { (src, l) -> if (l.isNotEmpty()) { data = LyricsData(l, "", src); return@LaunchedEffect } }
-        data = LyricsData(emptyList(), "Ищем текст…")
-        // длительность нужна для точного поиска, ждём её не дольше секунды
-        var durMs = c?.duration ?: -1L
-        var tries = 0
-        while (c != null && durMs <= 0 && tries < 10) { delay(100); durMs = c.duration; tries++ }
-        val durSec = if (durMs > 0) (durMs / 1000).toInt() else null
-        val notes = mutableListOf<String>()
-        val found = withContext(Dispatchers.IO) { LyricSources.find(id, title, artist, durSec, notes) }
-        if (found != null) {
-            LyricsCache.map[id] = found
-            data = LyricsData(found.second, "", found.first)
-        } else {
-            val hint = if (id.startsWith("ym")) "" else "\nМожно загрузить .lrc кнопкой сверху или распознать текст на устройстве."
-            data = LyricsData(emptyList(), (notes.joinToString("\n").ifBlank { "Текст не найден" }) + hint)
+        if (!id.startsWith("ym")) {   // локальный трек: сохранённые субтитры (Vosk)
+            val cached = withContext(Dispatchers.IO) { Transcriber.load(ctx, id) }
+            data = if (cached != null) LyricsData(cached, "") else LyricsData(emptyList(),
+                if (Style.subsEnabled) "Текста нет. Его можно распознать на устройстве."
+                else "Для локальных треков можно включить распознавание текста: Стиль → Субтитры.")
+            return@LaunchedEffect
         }
+        val none = "Для этого трека текста нет"
+        LyricsCache.map[id]?.let { data = LyricsData(it, if (it.isEmpty()) none else ""); return@LaunchedEffect }
+        try {
+            val l = withContext(Dispatchers.IO) { YandexApi.lyrics(id.removePrefix("ym")) }
+            LyricsCache.map[id] = l
+            data = LyricsData(l, if (l.isEmpty()) none else "")
+        } catch (e: Exception) { data = LyricsData(emptyList(), "Ошибка: ${e.message}") }
     }
     return data
 }
@@ -130,9 +120,8 @@ fun karaoke(text: String, start: Long, end: Long, pos: Long, on: Color, off: Col
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, pos: State<Long>, nextMs: Long?, onLong: () -> Unit, onClick: () -> Unit) {
+fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, pos: State<Long>, nextMs: Long?, onClick: () -> Unit) {
     val dist = if (active < 0) 0 else abs(i - active)
     val target = if (!synced || dist == 0) 1f else (0.6f - 0.1f * dist).coerceAtLeast(0.2f)
     val alpha = animateFloatAsState(target, tween(350), label = "a")
@@ -143,7 +132,7 @@ fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, p
             this.alpha = alpha.value; scaleX = scale.value; scaleY = scale.value
             transformOrigin = TransformOrigin(0f, 0.5f)
         }
-        .combinedClickable(onClick = { if (l.timeMs != null) onClick() }, onLongClick = onLong)
+        .clickable(enabled = l.timeMs != null, onClick = onClick)
         .padding(vertical = if (big) 8.dp else 4.dp)
     val fs = (if (big) 26 else 16).sp
     val lh = (if (big) 32 else 20).sp
@@ -159,33 +148,12 @@ fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, p
 @Composable
 fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val lyr = rememberLyrics(np.id, np.title, np.artist, c)
+    val lyr = rememberLyrics(np.id)
     val pos = rememberPosition(c, np.playing, 80)
     val synced = lyr.lines.any { it.timeMs != null }
     val active = rememberActive(lyr.lines, pos).value
     val listState = rememberLazyListState()
     LaunchedEffect(active) { if (active >= 0) listState.animateScrollToItem(active, scrollOffset = -280) }
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var editIndex by remember { mutableStateOf<Int?>(null) }
-    editIndex?.let { i -> if (i in lyr.lines.indices) EditLineDialog(ctx, np.id, lyr.lines, i) { editIndex = null } }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val id = np.id
-        if (uri != null && id != null) scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                try {
-                    val text = ctx.contentResolver.openInputStream(uri)!!.bufferedReader().readText().removePrefix("\uFEFF")
-                    val head = text.trimStart()
-                    // JSON со словами (Vosk / GigaAM-скрипт) или обычный .lrc / .txt
-                    val parsed = if (head.startsWith("[") && head.contains("\"word\"") || head.startsWith("{"))
-                        Transcriber.parseWordsJson(head) else YandexApi.parseLrc(text)
-                    if (parsed.isNotEmpty()) { Transcriber.save(ctx, id, parsed); true } else false
-                } catch (_: Exception) { false }
-            }
-            if (ok) Transcriber.version++
-            android.widget.Toast.makeText(ctx, if (ok) "Текст загружен" else "Не удалось прочитать файл", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
     AppBackground(np.art) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -193,15 +161,13 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(np.title ?: "", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(np.artist ?: "", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    if (lyr.source.isNotEmpty()) Text("Источник: ${lyr.source}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton({ picker.launch(arrayOf("*/*")) }) { Icon(Icons.Default.UploadFile, null, tint = Color.White) }
             }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 if (lyr.lines.isEmpty()) EmptyLyrics(lyr.status, np)
                 else LazyColumn(Modifier.fillMaxSize(), state = listState,
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 160.dp)) {
-                    itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, true, pos, lyr.lines.getOrNull(i + 1)?.timeMs, { editIndex = i }) { c?.seekTo(l.timeMs!!) } }
+                    itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, true, pos, lyr.lines.getOrNull(i + 1)?.timeMs) { c?.seekTo(l.timeMs!!) } }
                 }
             }
             SeekBar(c, pos)
@@ -234,7 +200,7 @@ private fun SeekBar(c: MediaController?, pos: State<Long>) {
 }
 
 @Composable
-fun EmptyLyrics(status: String, np: NowPlaying) {
+private fun EmptyLyrics(status: String, np: NowPlaying) {
     val ctx = LocalContext.current
     val id = np.id
     Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -247,42 +213,12 @@ fun EmptyLyrics(status: String, np: NowPlaying) {
                     LinearProgressIndicator({ p }, Modifier.fillMaxWidth())
                     Text("Распознавание… ${(p * 100).toInt()}%", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
                 }
-                !(if (Style.asrEngine == 1) Transcriber.gigaReady else Transcriber.modelReady) -> {
-                    val giga = Style.asrEngine == 1
-                    val busy = if (giga) Transcriber.gigaBusy else Transcriber.modelBusy
-                    val prog = if (giga) Transcriber.gigaProgress else Transcriber.modelProgress
-                    Button({ if (giga) Transcriber.downloadGiga(ctx) else Transcriber.downloadModel(ctx) }, enabled = !busy) {
-                        Text(if (busy) "Скачивание ${(prog * 100).toInt()}%" else if (giga) "Скачать GigaAM (около 285 МБ)" else "Скачать модель (около 45 МБ)")
-                    }
+                !Transcriber.modelReady -> Button({ Transcriber.downloadModel(ctx) }, enabled = !Transcriber.modelBusy) {
+                    Text(if (Transcriber.modelBusy) "Скачивание ${(Transcriber.modelProgress * 100).toInt()}%" else "Скачать модель (около 45 МБ)")
                 }
                 else -> Button({ np.uri?.let { Transcriber.start(ctx, id, it) } }, enabled = np.uri != null) { Text("Распознать текст") }
             }
             Transcriber.errors[id]?.let { Text("Ошибка: $it", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
         }
     }
-}
-
-/** Правка строки: время слов сохраняется (пересчитывается, если число слов изменилось). */
-@Composable
-fun EditLineDialog(ctx: android.content.Context, id: String?, lines: List<LyricLine>, i: Int, onClose: () -> Unit) {
-    var text by remember(i) { mutableStateOf(lines[i].text) }
-    fun commit(newText: String?) {
-        if (id != null) {
-            val out = lines.toMutableList()
-            val t = newText?.split(" ")?.filter { it.isNotBlank() }?.joinToString(" ") ?: ""
-            if (t.isEmpty()) out.removeAt(i) else out[i] = lines[i].copy(text = t, wordTimes = Transcriber.retime(lines[i].wordTimes, t))
-            Transcriber.save(ctx, id, out); Transcriber.version++
-        }
-        onClose()
-    }
-    AlertDialog(onDismissRequest = onClose, title = { Text("Править строку") },
-        text = { OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth()) },
-        confirmButton = { TextButton({ commit(text) }) { Text("Сохранить") } },
-        dismissButton = {
-            Row {
-                TextButton({ commit(null) }) { Text("Удалить") }
-                TextButton({ if (id != null) Transcriber.clear(ctx, id); onClose() }) { Text("Сбросить всё") }
-                TextButton(onClose) { Text("Отмена") }
-            }
-        })
 }

@@ -8,7 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,8 +31,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val ctx = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) { Transcriber.refresh(ctx) }
-    var showCatalog by remember { mutableStateOf(false) }
-    if (showCatalog) ModelCatalogDialog { showCatalog = false }
     val blurOk = android.os.Build.VERSION.SDK_INT >= 31 && ctx.getSystemService(android.view.WindowManager::class.java).isCrossWindowBlurEnabled
     AppBackground(null) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
@@ -42,10 +41,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
             Text("Сборка ${Style.BUILD}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
             Card("Тема") {
-                val names = listOf("Стекло", "Матовое стекло", "Минимализм", "AMOLED")
-                val ids = listOf(0, 3, 1, 2)
-                for (rowStart in listOf(0, 2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (k in rowStart..rowStart + 1) FilterChip(Style.theme == ids[k], { Style.theme = ids[k]; Style.save() }, { Text(names[k]) })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Стекло", "Минимализм", "AMOLED").forEachIndexed { i, n ->
+                        FilterChip(Style.theme == i, { Style.theme = i; Style.save() }, { Text(n) })
+                    }
                 }
             }
             Card("Акцентный цвет") {
@@ -70,65 +69,21 @@ fun SettingsScreen(onBack: () -> Unit) {
             Card("Плотность оверлея") {
                 Slider(Style.overlayAlpha, { Style.overlayAlpha = it }, valueRange = 0.3f..1f, onValueChangeFinished = Style::save)
             }
-            Card("Вид «Моей волны»") {
-                Text("Меняется сразу: Яндекс Музыка → Моя волна.", color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
-                WAVE_STYLES.forEachIndexed { i, (name, desc) ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { Style.waveStyle = i; Style.save() }.padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(Style.waveStyle == i, null)
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(name, color = Color.White)
-                            Text(desc, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            Card("Источники текстов") {
-                Text("Если в одном нет текста, приложение пробует следующий. Для любых треков, в том числе локальных.",
-                    color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
-                SwitchRow("Яндекс Музыка (для её треков)", Style.lyYandex) { Style.lyYandex = it; Style.save() }
-                SwitchRow("LRCLIB (открытая база, есть таймкоды)", Style.lyLrclib) { Style.lyLrclib = it; Style.save() }
-                SwitchRow("lyrics.ovh (только обычный текст)", Style.lyOvh) { Style.lyOvh = it; Style.save() }
-            }
             Card("Субтитры (Vosk)") {
                 SwitchRow("Распознавать текст песен на устройстве", Style.subsEnabled) { Style.subsEnabled = it; Style.save() }
-                Text("Для локальных треков без текста. Работает офлайн; точность зависит от модели и музыки. " +
-                    "Исправить текст можно долгим нажатием на строку, а готовый .lrc загрузить кнопкой на экране текста.",
+                Text("Для локальных треков без текста. Работает офлайн; точность зависит от музыки, лучше всего на чистом вокале.",
                     color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
                 if (Style.subsEnabled) {
-                    Pill(listOf("Vosk", "GigaAM"), Style.asrEngine, { Style.asrEngine = it; Style.save() })
-                }
-                if (Style.subsEnabled && Style.asrEngine == 1) {
-                    Text("GigaAM (Сбер): для русского заметно точнее Vosk, слова подсвечиваются по точному времени. Модель около 285 МБ. " +
-                        "Лицензия модели некоммерческая: только для личного использования.",
-                        color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
-                    Text(if (Transcriber.gigaReady) "Модель установлена" else "Модель не скачана", color = Color.White, style = MaterialTheme.typography.bodySmall)
-                    if (Transcriber.gigaBusy) {
-                        Text(Transcriber.gigaStage, color = Color.White, style = MaterialTheme.typography.bodySmall)
-                        LinearProgressIndicator({ Transcriber.gigaProgress }, Modifier.fillMaxWidth())
-                    }
-                    Transcriber.gigaError?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
-                    if (!Transcriber.gigaReady) Button({ Transcriber.downloadGiga(ctx) }, enabled = !Transcriber.gigaBusy) { Text("Скачать GigaAM") }
-                    else TextButton({ Transcriber.deleteGiga(ctx) }) { Text("Удалить модель") }
-                }
-                if (Style.subsEnabled && Style.asrEngine == 0) {
-                    Text("Активная модель: " + Transcriber.activeModel.ifBlank { "не выбрана" }, color = Color.White, style = MaterialTheme.typography.bodySmall)
-                    if (Transcriber.modelBusy) {
-                        Text("${Transcriber.modelName}: ${Transcriber.modelStage}", color = Color.White, style = MaterialTheme.typography.bodySmall)
-                        LinearProgressIndicator({ Transcriber.modelProgress }, Modifier.fillMaxWidth())
-                    }
+                    val busy = Transcriber.modelBusy
+                    Text(when {
+                        busy -> "Скачивание модели… ${(Transcriber.modelProgress * 100).toInt()}%"
+                        Transcriber.modelReady -> "Русская модель установлена"
+                        else -> "Модель не скачана (около 45 МБ)"
+                    }, color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    if (busy) LinearProgressIndicator({ Transcriber.modelProgress }, Modifier.fillMaxWidth())
                     Transcriber.modelError?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
-                    if (Transcriber.logs.isNotEmpty()) Text(Transcriber.logs.takeLast(6).joinToString("\n"),
-                        color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
-                    Button({ showCatalog = true }) { Text("Выбрать модель (весь каталог Vosk)") }
-                    Transcriber.installed.forEach { name ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(name + if (name == Transcriber.activeModel) "  ✓" else "", Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.bodySmall)
-                            if (name != Transcriber.activeModel) TextButton({ Transcriber.select(ctx, name) }) { Text("Выбрать") }
-                            TextButton({ Transcriber.deleteModel(ctx, name) }) { Text("Удалить") }
-                        }
-                    }
+                    if (!Transcriber.modelReady) Button({ Transcriber.downloadModel(ctx) }, enabled = !busy) { Text("Скачать модель") }
+                    else TextButton({ Transcriber.deleteModel(ctx) }) { Text("Удалить модель") }
                 }
             }
             Card("Редактор оверлея") {

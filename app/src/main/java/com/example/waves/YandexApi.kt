@@ -56,7 +56,7 @@ object YandexApi {
     private fun json(url: String, post: String? = null) = JSONObject(request(url, post))
 
     private fun parse(o: JSONObject): Track {
-        val id = o.get("id").toString().substringBefore(":")
+        val id = o.get("id").toString()
         val artists = o.optJSONArray("artists")
         val names = (0 until (artists?.length() ?: 0)).joinToString(", ") { artists!!.getJSONObject(it).optString("name") }
         val cover = o.optString("coverUri").takeIf { it.isNotBlank() }?.let { Uri.parse("https://" + it.replace("%%", "400x400")) }
@@ -75,73 +75,10 @@ object YandexApi {
         return details((0 until minOf(arr.length(), 300)).map { arr.getJSONObject(it).get("id").toString() })
     }
 
-    fun search(q: String, page: Int = 0): List<Track> {
-        val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=track&page=$page")
+    fun search(q: String): List<Track> {
+        val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=track&page=0")
             .getJSONObject("result").optJSONObject("tracks")?.optJSONArray("results") ?: return emptyList()
-        return (0 until res.length()).map { parse(res.getJSONObject(it)) }.distinctBy { it.id }
-    }
-
-    private fun coverUri(raw: String?): Uri? =
-        raw?.takeIf { it.isNotBlank() }?.let { Uri.parse("https://" + it.replace("%%", "400x400")) }
-
-    private fun parseArtist(o: JSONObject): ArtistItem {
-        val c = o.optJSONObject("counts")
-        val sub = listOfNotNull(
-            c?.optInt("tracks", 0)?.takeIf { it > 0 }?.let { "$it треков" },
-            c?.optInt("directAlbums", 0)?.takeIf { it > 0 }?.let { "$it альбомов" }).joinToString(" · ")
-        val gs = o.optJSONArray("genres")
-        val genres = (0 until (gs?.length() ?: 0)).joinToString(", ") { gs!!.optString(it) }
-        val cover = coverUri(o.optJSONObject("cover")?.optString("uri")) ?: coverUri(o.optString("ogImage"))
-        return ArtistItem(o.get("id").toString(), o.optString("name"), cover, sub, genres)
-    }
-
-    fun searchArtists(q: String): List<ArtistItem> {
-        val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=artist&page=0")
-            .getJSONObject("result").optJSONObject("artists")?.optJSONArray("results") ?: return emptyList()
-        return (0 until res.length()).map { parseArtist(res.getJSONObject(it)) }.distinctBy { it.id }.take(15)
-    }
-
-    private fun artistTracks(id: String): List<Track> {
-        val arr = json("$BASE/artists/$id/tracks?page=0&page-size=30").getJSONObject("result").optJSONArray("tracks") ?: return emptyList()
-        return (0 until arr.length()).map { parse(arr.getJSONObject(it)) }
-    }
-
-    /** Профиль исполнителя: популярные треки, альбомы, похожие исполнители. */
-    fun artistProfile(id: String): ArtistProfile {
-        val r = json("$BASE/artists/$id/brief-info").getJSONObject("result")
-        val artist = parseArtist(r.getJSONObject("artist"))
-        var tracks = r.optJSONArray("popularTracks")?.let { arr ->
-            (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let { o -> parse(o) } }
-        } ?: emptyList()
-        if (tracks.isEmpty()) tracks = artistTracks(id)
-        val albums = r.optJSONArray("albums")?.let { arr ->
-            (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { o ->
-                AlbumItem(o.get("id").toString(), o.optString("title"),
-                    o.optString("year").ifBlank { o.optString("releaseDate").take(4) }, coverUri(o.optString("coverUri")))
-            }
-        } ?: emptyList()
-        val similar = r.optJSONArray("similarArtists")?.let { arr ->
-            (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let { o -> parseArtist(o) } }
-        } ?: emptyList()
-        return ArtistProfile(artist, tracks.distinctBy { it.id }, albums.distinctBy { it.id }, similar.distinctBy { it.id })
-    }
-
-    /** Треки альбома. */
-    fun album(id: String): List<Track> {
-        val vols = json("$BASE/albums/$id/with-tracks").getJSONObject("result").optJSONArray("volumes") ?: return emptyList()
-        val out = mutableListOf<Track>()
-        for (i in 0 until vols.length()) {
-            val v = vols.getJSONArray(i)
-            for (k in 0 until v.length()) out += parse(v.getJSONObject(k))
-        }
-        return out.distinctBy { it.id }
-    }
-
-    /** «Моя волна»: бесконечная подборка. afterId — последний трек очереди, чтобы получить продолжение. */
-    fun wave(afterId: String? = null): List<Track> {
-        val q = if (afterId != null) "&queue=$afterId" else ""
-        val seq = json("$BASE/rotor/station/user:onyourwave/tracks?settings2=true$q").getJSONObject("result").getJSONArray("sequence")
-        return (0 until seq.length()).mapNotNull { i -> seq.getJSONObject(i).optJSONObject("track")?.let { parse(it) } }.distinctBy { it.id }
+        return (0 until res.length()).map { parse(res.getJSONObject(it)) }
     }
 
     /** Блокирующий вызов: вызывается из загрузчика ExoPlayer (не из UI-потока). */
@@ -191,7 +128,7 @@ object YandexApi {
         throw err ?: IOException("нет ответа")
     }
 
-    fun parseLrc(text: String): List<LyricLine> {
+    private fun parseLrc(text: String): List<LyricLine> {
         val out = mutableListOf<LyricLine>()
         val rx = Regex("\\[(\\d+):(\\d+)(?:[.:](\\d+))?]")
         for (line in text.lines()) {
@@ -208,7 +145,3 @@ object YandexApi {
 }
 
 data class LyricLine(val timeMs: Long?, val text: String, val wordTimes: List<Pair<Long, Long>>? = null)
-
-data class ArtistItem(val id: String, val name: String, val cover: Uri?, val sub: String, val genres: String = "")
-data class AlbumItem(val id: String, val title: String, val year: String, val cover: Uri?)
-data class ArtistProfile(val artist: ArtistItem, val tracks: List<Track>, val albums: List<AlbumItem>, val similar: List<ArtistItem>)
