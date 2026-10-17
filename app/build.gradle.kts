@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "com.example.waves"
     compileSdk = 35
-    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 15; versionName = "0.15"; ndk { abiFilters += listOf("arm64-v8a") } }
+    defaultConfig { applicationId = "com.example.waves"; minSdk = 26; targetSdk = 35; versionCode = 16; versionName = "0.16"; ndk { abiFilters += listOf("arm64-v8a") } }
     signingConfigs { getByName("debug") { storeFile = file("debug.keystore"); storePassword = "android"; keyAlias = "androiddebugkey"; keyPassword = "android" } }
     buildFeatures { compose = true }
     packaging { jniLibs { useLegacyPackaging = true; pickFirsts += listOf("**/libc++_shared.so") } }

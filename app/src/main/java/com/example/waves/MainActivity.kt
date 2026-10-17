@@ -52,10 +52,15 @@ fun Home(onSettings: () -> Unit) {
     }
     var tab by remember { mutableIntStateOf(0) }
     var showLyrics by remember { mutableStateOf(false) }
+    val startPlayTop: (List<Track>, Int) -> Unit = { list, i ->
+        Wave.active = false
+        c?.run { setMediaItems(list.map { it.toMediaItem() }, i, 0); prepare(); play() }
+    }
     WaveFeeder(c, np)
     Crossfade(showLyrics, animationSpec = tween(350), label = "screen") { lyr ->
     if (lyr) LyricsScreen(c, np) { showLyrics = false } else AppBackground(np.art) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        if (Style.layout == 1) StreamingHome(c, np, tracks, startPlayTop, onSettings) { showLyrics = true }
+        else Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(20.dp, 16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Waves", Modifier.weight(1f), style = MaterialTheme.typography.headlineLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Light, color = Color.White)
                 IconButton({ tab = if (tab == 0) 1 else 0 }) {

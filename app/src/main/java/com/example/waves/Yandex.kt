@@ -78,7 +78,7 @@ fun WaveFeeder(c: MediaController?, np: NowPlaying) {
 }
 
 @Composable
-fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
+fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier, showTabs: Boolean = true) {
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -152,7 +152,7 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                 },
                 modifier = Modifier.weight(1f))
         } else {
-            Pill(listOf("Моя волна", "Поиск", "Мне нравится"), YState.section,
+            if (showTabs) Pill(listOf("Моя волна", "Поиск", "Мне нравится"), YState.section,
                 { YState.section = it; status = null; if (it == 2 && YState.likes.isEmpty()) loadLikes() },
                 Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp, 8.dp))
