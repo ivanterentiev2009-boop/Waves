@@ -70,6 +70,20 @@ fun SettingsScreen(onBack: () -> Unit) {
             Card("Плотность оверлея") {
                 Slider(Style.overlayAlpha, { Style.overlayAlpha = it }, valueRange = 0.3f..1f, onValueChangeFinished = Style::save)
             }
+            Card("Вид «Моей волны»") {
+                Text("Меняется сразу: Яндекс Музыка → Моя волна.", color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)
+                WAVE_STYLES.forEachIndexed { i, (name, desc) ->
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { Style.waveStyle = i; Style.save() }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(Style.waveStyle == i, null)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(name, color = Color.White)
+                            Text(desc, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             Card("Источники текстов") {
                 Text("Если в одном нет текста, приложение пробует следующий. Для любых треков, в том числе локальных.",
                     color = Color(0x99FFFFFF), style = MaterialTheme.typography.bodySmall)

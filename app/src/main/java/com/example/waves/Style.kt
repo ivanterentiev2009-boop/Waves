@@ -48,6 +48,7 @@ object Style {
     var ovEq by mutableStateOf(true)
     var ovLyric by mutableStateOf(true)
     var ovStart by mutableIntStateOf(1)        // 0 пузырёк, 1 компактный, 2 полный
+    var waveStyle by mutableIntStateOf(0)       // вид «Моей волны»
     var lyYandex by mutableStateOf(true)      // источники текстов
     var lyLrclib by mutableStateOf(true)
     var lyOvh by mutableStateOf(true)
@@ -62,12 +63,12 @@ object Style {
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
         ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
-        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true)
+        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws", 0)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
             ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)
-            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.apply()
+            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws", waveStyle)?.apply()
     }
 }
 
