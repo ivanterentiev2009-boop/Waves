@@ -126,6 +126,7 @@ fun Equalizer(modifier: Modifier = Modifier, playing: Boolean) {
     val barsState = VizBus.bars.collectAsState()
     val bottom = Color(Style.accent); val top = lerp(bottom, Color.White, 0.55f)
     Canvas(modifier) {
+        if (!playing) return@Canvas
         val bars = barsState.value
         val n = bars.size
         val gap = size.width / n * 0.4f

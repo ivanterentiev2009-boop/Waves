@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -153,10 +154,9 @@ fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false)
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(0.55f), Color.White.copy(0.04f), Color.White.copy(0.25f))), shape)
         1 -> this.clip(shape).background(Color(0xFF17171C).copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.07f), shape)
-        3 -> this.clip(shape)          // матовое стекло: молочная панель без преломления
-            .background(Color(0xFF16161D).copy(alpha = 0.45f * strength))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(0.16f + Style.glass * 0.5f), Color.White.copy(0.08f + Style.glass * 0.3f))))
-            .border(1.dp, Color.White.copy(0.20f), shape)
+        3 -> this.clip(shape)          // матовое стекло: ровная приглушённая панель, без бликов и градиентов
+            .background(Color(0xFF1B1B22).copy(alpha = ((0.50f + Style.glass * 0.6f).coerceAtMost(0.9f)) * strength))
+            .border(1.dp, Color.White.copy(0.06f), shape)
         else -> this.clip(shape).background(Color.Black.copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.10f), shape)
     }
@@ -175,12 +175,14 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
                 if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 5.dp else 70.dp).alpha(if (glassCapable) 0.85f else 0.5f), contentScale = ContentScale.Crop)
             }
         } else if (Style.theme == 3) {
-            val a = Color(Style.accent)
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(a.copy(0.42f), Color(0xFF14141B), a.copy(0.22f)))))
-            if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(70.dp).alpha(0.55f), contentScale = ContentScale.Crop)
+            // приглушённый акцент: при светлом акценте фон не засвечивается
+            val a = lerp(Color(Style.accent), Color(0xFF14141B), 0.55f)
+            Box(Modifier.fillMaxSize().background(Color(0xFF111117)))
+            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(a.copy(0.55f), Color.Transparent, a.copy(0.30f)))))
+            if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(70.dp).alpha(0.35f), contentScale = ContentScale.Crop)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                 val rnd = kotlin.random.Random(3)
-                repeat(500) { drawCircle(Color.White.copy(0.04f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
+                repeat(500) { drawCircle(Color.White.copy(0.03f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
             }
         }
         content()

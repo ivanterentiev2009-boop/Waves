@@ -78,7 +78,11 @@ fun WaveHero(np: NowPlaying, active: Boolean, loading: Boolean, onToggle: () -> 
     LaunchedEffect(Unit) { while (true) withFrameNanos { clock.longValue = it / 1_000_000 } }
     val bars = VizBus.bars.collectAsState()
     val playing = np.playing && active
-    Box(Modifier.fillMaxWidth().height(500.dp)) {
+    val shape = RoundedCornerShape((Style.corner * 1.2f).dp)
+    // герой-карточка со скруглением: не торчит прямоугольником из фона, а выглядит как единый блок
+    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(440.dp)
+        .clip(shape).border(1.dp, Color.White.copy(0.08f), shape)) {
+        if (Style.waveStyle != 2 && Style.waveStyle != 4) Box(Modifier.matchParentSize().background(Color.Black.copy(0.28f)))
         when (Style.waveStyle) {
             1 -> RaysLayer(np, active, playing, clock, bars)
             2 -> RipplesLayer(np, active, playing, clock)
@@ -91,17 +95,21 @@ fun WaveHero(np: NowPlaying, active: Boolean, loading: Boolean, onToggle: () -> 
             color = Color.White, fontSize = 44.sp, lineHeight = 46.sp, fontWeight = FontWeight.Bold)
         else if (Style.waveStyle != 4) Text("Моя волна", Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 16.dp),
             color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        WaveControls(np, active, loading, playing, bars, onToggle, onStop)
+        if (active) TextButton(onStop, Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 8.dp)) {
+            Text("Остановить", color = Color.White.copy(0.85f))
+        }
+        WaveControls(np, active, loading, playing, bars, onToggle)
     }
 }
 
 @Composable
 private fun BoxScope.WaveControls(np: NowPlaying, active: Boolean, loading: Boolean, playing: Boolean,
-                                  bars: State<FloatArray>, onToggle: () -> Unit, onStop: () -> Unit) {
+                                  bars: State<FloatArray>, onToggle: () -> Unit) {
     val accent = Color(Style.accent)
     Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(if (active && np.title != null) "${np.title} · ${np.artist ?: ""}" else "Нажми и поплыви по своим вкусам",
-            Modifier.padding(horizontal = 24.dp), color = Color.White.copy(0.9f), style = MaterialTheme.typography.bodyMedium,
+            Modifier.padding(horizontal = 24.dp).panel(RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 6.dp),
+            color = Color.White.copy(0.95f), style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(12.dp))
         Box(Modifier.size(84.dp)
@@ -114,7 +122,6 @@ private fun BoxScope.WaveControls(np: NowPlaying, active: Boolean, loading: Bool
             if (loading) CircularProgressIndicator(Modifier.size(34.dp), color = Color.Black, strokeWidth = 3.dp)
             else Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(44.dp), tint = Color.Black)
         }
-        if (active) TextButton(onStop) { Text("Остановить подборку", color = Color.White.copy(0.8f)) }
     }
 }
 
@@ -168,7 +175,7 @@ private fun BoxScope.RaysLayer(np: NowPlaying, active: Boolean, playing: Boolean
         val avg = if (live) b.average().toFloat() else 0.05f
         val c = Offset(size.width / 2, 175.dp.toPx())
         val glow = 175.dp.toPx()
-        drawCircle(Brush.radialGradient(listOf(accent.copy(0.30f + 0.3f * avg), Color.Transparent), center = c, radius = glow), glow, c)
+        drawCircle(Brush.radialGradient(listOf(accent.copy(0.18f + 0.18f * avg), Color.Transparent), center = c, radius = glow), glow, c)
         val count = 64; val half = count / 2
         val r0 = 68.dp.toPx()
         val rot = clock.longValue / 1000f * 0.25f
@@ -208,16 +215,22 @@ private fun BoxScope.RipplesLayer(np: NowPlaying, active: Boolean, playing: Bool
     }
     Canvas(Modifier.fillMaxSize()) {
         val now = clock.longValue
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF07101A), Color(0xFF0B2233), accent.copy(0.35f)), startY = 0f, endY = size.height))
-        val cx = size.width / 2; val cy = 250.dp.toPx()
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF07101A).copy(0.70f), Color(0xFF0B2233).copy(0.55f),
+            lerp(accent, Color(0xFF0B2233), 0.5f).copy(0.45f)), startY = 0f, endY = size.height))
+        val cx = size.width / 2; val cy = 215.dp.toPx()
+        val coverC = Offset(cx, 150.dp.toPx())
+        drawCircle(Brush.radialGradient(listOf(accent.copy(0.18f), Color.Transparent), center = coverC, radius = 120.dp.toPx()), 120.dp.toPx(), coverC)
         ripples.forEach { start ->
-            val f = ((now - start) / 2500f).coerceIn(0f, 1f)
-            val r = 40.dp.toPx() + f * 240.dp.toPx()
-            drawOval(lerp(accent, cyan, f).copy((1f - f) * 0.85f), Offset(cx - r, cy - r * 0.32f), Size(2 * r, r * 0.64f),
-                style = Stroke((3.5f - 2f * f).dp.toPx()))
+            val f = ((now - start) / 2200f).coerceIn(0f, 1f)
+            val r = 36.dp.toPx() + f * 170.dp.toPx()
+            val col = lerp(accent, cyan, f)
+            val fade = (1f - f) * (1f - f)
+            val tl = Offset(cx - r, cy - r * 0.28f); val sz = Size(2 * r, r * 0.56f)
+            drawOval(col.copy(fade * 0.20f), tl, sz, style = Stroke(10.dp.toPx() * (1f - f) + 2.dp.toPx()))   // мягкое свечение
+            drawOval(col.copy(fade * 0.85f), tl, sz, style = Stroke((2.5f * (1f - f) + 1f).dp.toPx()))
         }
     }
-    Box(Modifier.align(Alignment.TopCenter).padding(top = 105.dp).size(130.dp)
+    Box(Modifier.align(Alignment.TopCenter).padding(top = 85.dp).size(130.dp)
         .graphicsLayer { translationY = sin(clock.longValue / 1000f * 1.2f) * 8.dp.toPx() }
         .clip(CircleShape).border(2.dp, Color.White.copy(0.6f), CircleShape)) { WaveArtFill(np, active) }
 }
@@ -240,7 +253,7 @@ private fun BoxScope.VinylLayer(np: NowPlaying, active: Boolean, playing: Boolea
         val b = bars.value
         val avg = if (playing && b.isNotEmpty()) b.average().toFloat() else 0f
         val c = Offset(size.width / 2, 185.dp.toPx()); val r = 220.dp.toPx()
-        drawCircle(Brush.radialGradient(listOf(accent.copy(0.30f + 0.3f * avg), Color.Transparent), center = c, radius = r), r, c)
+        drawCircle(Brush.radialGradient(listOf(accent.copy(0.18f + 0.18f * avg), Color.Transparent), center = c, radius = r), r, c)
     }
     Box(Modifier.align(Alignment.TopCenter).padding(top = 70.dp).size(230.dp).graphicsLayer { rotationZ = angle.floatValue }) {
         Canvas(Modifier.fillMaxSize()) {
@@ -272,7 +285,7 @@ private fun BoxScope.VinylLayer(np: NowPlaying, active: Boolean, playing: Boolea
 private fun BoxScope.MinimalLayer(np: NowPlaying, active: Boolean, playing: Boolean, clock: LongState, bars: State<FloatArray>) {
     val accent = Color(Style.accent)
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.linearGradient(listOf(accent.copy(0.55f), Color(0xFF0B0B10)), start = Offset(0f, 0f), end = Offset(size.width, size.height * 0.85f)))
+        drawRect(Brush.linearGradient(listOf(lerp(accent, Color(0xFF0B0B10), 0.45f).copy(0.75f), Color(0xFF0B0B10)), start = Offset(0f, 0f), end = Offset(size.width, size.height * 0.85f)))
         val rnd = kotlin.random.Random(7)
         repeat(260) { drawCircle(Color.White.copy(0.05f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
         val b = bars.value; val live = playing && b.isNotEmpty()
