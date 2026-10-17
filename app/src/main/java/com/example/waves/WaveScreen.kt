@@ -137,6 +137,7 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
                         onStation: ((String) -> Unit)?, onShake: (() -> Unit)?) {
     val accent = Color(Style.accent)
     val mainShape = RoundedCornerShape(40.dp)
+    val tileArt = extra.getOrNull(0) ?: art
     Box(Modifier.fillMaxWidth().height(450.dp)) {
         // волнистая лента на фоне
         Canvas(Modifier.fillMaxSize()) {
@@ -158,16 +159,16 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
             .clip(mainShape).background(Color(0x22FFFFFF))
             .then(if (activeKind == "wave") Modifier.border(2.dp, accent, mainShape) else Modifier)
             .clickable { onStation?.invoke("wave") }) { ArtFill(art) }
-        WaveTile("По артисту", artistName, art, Color(0xFFFF8AD8), activeKind == "artist",
+        WaveTile("По артисту", artistName, tileArt, Color(0xFFFF8AD8), activeKind == "artist",
             Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 74.dp).size(108.dp)
                 .graphicsLayer { translationY = sin(bob.value + 1.5f) * 7.dp.toPx(); rotationZ = 5f }) { onStation?.invoke("artist") }
-        WaveTile("По песне", songName, art, Color(0xFF5CC8FF), activeKind == "song",
+        WaveTile("По песне", songName, tileArt, Color(0xFF5CC8FF), activeKind == "song",
             Modifier.align(Alignment.TopEnd).padding(end = 30.dp, top = 196.dp).size(108.dp)
                 .graphicsLayer { translationY = sin(bob.value + 3f) * 7.dp.toPx(); rotationZ = -4f }) { onStation?.invoke("song") }
         Row(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, bottom = 66.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(if (playing && np.title != null) np.title else "Бесконечная подборка", color = Color.White.copy(0.9f),
+            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White.copy(0.9f),
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.widthIn(max = 200.dp))
         }
         if (onShake != null) ShakeChip(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 16.dp), onShake)
@@ -211,9 +212,9 @@ private fun PulseHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Bool
             .clip(CircleShape).background(Color(0x22FFFFFF))) { ArtFill(art) }
         Column(Modifier.align(Alignment.TopCenter).padding(top = 330.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (playing && np.title != null) np.title else "Бесконечная подборка", color = Color.White, fontSize = 22.sp,
+            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White, fontSize = 22.sp,
                 fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (playing) (np.artist ?: "") else "Нажми, чтобы начать", color = Color(0xB3FFFFFF),
+            Text(if (np.title != null) (np.artist ?: "") else "Нажми, чтобы начать", color = Color(0xB3FFFFFF),
                 style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         PlayOrb(76.dp, playing, loading, bars, Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp), onToggle)
@@ -256,9 +257,9 @@ private fun SurfHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Boole
             .graphicsLayer { translationY = sin(bob.value) * 7.dp.toPx(); rotationZ = sin(bob.value) * 4f }
             .clip(RoundedCornerShape(30.dp)).background(Color(0x22FFFFFF))) { ArtFill(art) }
         Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 20.dp).widthIn(max = 220.dp)) {
-            Text(if (playing && np.title != null) np.title else "Бесконечная подборка", color = Color.White,
+            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White,
                 fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (playing) Text(np.artist ?: "", color = Color.White.copy(0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            if (np.title != null) Text(np.artist ?: "", color = Color.White.copy(0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
         }
         PlayOrb(84.dp, playing, loading, bars, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 18.dp), onToggle)
     }

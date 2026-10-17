@@ -169,12 +169,13 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     val source = if (YState.wave.isNotEmpty()) YState.wave else YState.likes
     val idx = source.indexOfFirst { it.id == cur }
     val upcoming = (if (Wave.active && idx >= 0) source.drop(idx + 1) else source).take(12)
-    val heroArt = if (Wave.active && np.art != null) np.art else source.firstOrNull()?.art
+    val heroArt = np.art ?: source.firstOrNull()?.art   // слева всегда то, что играет сейчас
     // трек, от которого строятся волны по артисту и по песне: текущий или первый из понравившихся
     val seedLive = np.id?.startsWith("ym") == true
     val seedId: String? = if (seedLive) np.id else source.firstOrNull()?.id
     val seedTitle: String? = if (seedLive) np.title else source.firstOrNull()?.title
     val seedArtist: String? = if (seedLive) np.artist else source.firstOrNull()?.artist
+    val seedArt: Uri? = if (seedLive) np.art else source.firstOrNull()?.art
     fun loadWave(resolve: suspend () -> String) {
         scope.launch {
             loading = true; err = null
@@ -201,7 +202,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     fun shake() = loadWave { Wave.station }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
         item {
-            WaveHero(np, heroArt, source.drop(1).map { it.art }, np.playing && Wave.active, loading,
+            WaveHero(np, heroArt, listOf(seedArt), np.playing && Wave.active, loading,
                 onToggle = { if (!Wave.active) startStation("wave") else if (np.playing) c?.pause() else c?.play() },
                 artistName = seedArtist, songName = seedTitle,
                 activeKind = if (!Wave.active) null else when {
