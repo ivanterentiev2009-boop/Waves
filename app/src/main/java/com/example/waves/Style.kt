@@ -253,7 +253,7 @@ fun MatteBackdrop(art: Uri?, artBlur: androidx.compose.ui.unit.Dp, modifier: Mod
 fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     if (Style.theme != 3 || Build.VERSION.SDK_INT < 31) { Box(modifier.panel(shape, refract = refract), content = content); return }
     val pos = remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
-    val win = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val win = androidx.compose.ui.platform.LocalWindowInfo.current.windowSize
     val backdrop = Modifier.layout { m, _ ->
         val p = m.measure(androidx.compose.ui.unit.Constraints.fixed(win.width, win.height))
         layout(0, 0) { p.place(-pos.value.x, -pos.value.y) }
