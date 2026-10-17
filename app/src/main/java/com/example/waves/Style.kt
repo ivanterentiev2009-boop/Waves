@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -50,6 +52,7 @@ object Style {
     var ovLyric by mutableStateOf(true)
     var ovStart by mutableIntStateOf(1)        // 0 пузырёк, 1 компактный, 2 полный
     var layout by mutableIntStateOf(1)          // 0 классический, 1 как в стриминговых приложениях
+    var bgArt by mutableStateOf<Uri?>(null)     // обложка на фоне (для размытия под панелями)
     var waveStyle by mutableIntStateOf(0)       // вид «Моей волны»
     var lyYandex by mutableStateOf(true)      // источники текстов
     var lyLrclib by mutableStateOf(true)
@@ -164,6 +167,7 @@ fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false)
 
 @Composable
 fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
+    SideEffect { Style.bgArt = art }
     val base = when (Style.theme) { 2 -> Color.Black; 1 -> Color(0xFF0B0B0E); else -> Color(0xFF08080D) }
     Box(Modifier.fillMaxSize().background(base)) {
         if (Style.theme == 0) {
@@ -176,11 +180,7 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
                 if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 5.dp else 70.dp).alpha(if (glassCapable) 0.85f else 0.5f), contentScale = ContentScale.Crop)
             }
         } else if (Style.theme == 3) {
-            // приглушённый акцент: при светлом акценте фон не засвечивается
-            val a = lerp(Color(Style.accent), Color(0xFF14141B), 0.55f)
-            Box(Modifier.fillMaxSize().background(Color(0xFF111117)))
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(a.copy(0.55f), Color.Transparent, a.copy(0.30f)))))
-            if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(70.dp).alpha(0.35f), contentScale = ContentScale.Crop)
+            MatteBackdrop(art, 16.dp, Modifier.fillMaxSize())
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                 val rnd = kotlin.random.Random(3)
                 repeat(500) { drawCircle(Color.White.copy(0.03f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
@@ -228,6 +228,42 @@ fun OverlaySurface(shape: Shape, strength: Float, modifier: Modifier, art: Uri?,
         }
         Box(Modifier.matchParentSize().border(1.2.dp, Brush.linearGradient(
             listOf(Color.White.copy(0.75f), Color.White.copy(0.05f), Color.White.copy(0.4f))), shape))
+        content()
+    }
+}
+
+/** Фон матового стекла: мягкий градиент и размытая обложка. */
+@Composable
+fun MatteBackdrop(art: Uri?, artBlur: androidx.compose.ui.unit.Dp, modifier: Modifier) {
+    val tint = lerp(Color(Style.accent), Color.Black, 0.65f)
+    Box(modifier) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF111116)))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint.copy(0.55f), Color(0xFF111116), tint.copy(0.30f)))))
+        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.45f), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.25f)))
+    }
+}
+
+/**
+ * Панель. В теме «Матовое стекло» под ней настоящее размытие фона: рисуется тот же фон, сильно размытый и
+ * сдвинутый ровно так, чтобы совпасть с положением панели. В остальных темах обычная панель.
+ * Использовать для неподвижных панелей (плеер, нижняя панель), в прокручиваемых списках дорого.
+ */
+@Composable
+fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = false, content: @Composable BoxScope.() -> Unit) {
+    if (Style.theme != 3 || Build.VERSION.SDK_INT < 31) { Box(modifier.panel(shape, refract = refract), content = content); return }
+    val pos = remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
+    val win = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val backdrop = Modifier.layout { m, _ ->
+        val p = m.measure(androidx.compose.ui.unit.Constraints.fixed(win.width, win.height))
+        layout(0, 0) { p.place(-pos.value.x, -pos.value.y) }
+    }
+    Box(modifier.onGloballyPositioned {
+        val o = it.positionInRoot()
+        pos.value = androidx.compose.ui.unit.IntOffset(o.x.toInt(), o.y.toInt())
+    }.clip(shape).border(1.dp, Color.White.copy(0.10f), shape)) {
+        MatteBackdrop(Style.bgArt, 55.dp, backdrop)
+        Box(Modifier.matchParentSize().background(Color.White.copy(0.06f + Style.glass * 0.25f)))
         content()
     }
 }

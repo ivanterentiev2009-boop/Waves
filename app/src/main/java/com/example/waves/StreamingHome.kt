@@ -137,8 +137,8 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
 private fun NavBar(sel: Int, onSel: (Int) -> Unit) {
     val items = listOf(Icons.Default.GraphicEq to "Волна", Icons.Default.LibraryMusic to "Коллекция",
         Icons.Default.Search to "Поиск", Icons.Default.Tune to "Настройки")
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).panel(RoundedCornerShape(32.dp)).padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Frosted(RoundedCornerShape(32.dp), Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+    Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         items.forEachIndexed { i, (icon, label) ->
             val on = i == sel
             val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "nb")
@@ -146,6 +146,7 @@ private fun NavBar(sel: Int, onSel: (Int) -> Unit) {
             Box(Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(26.dp)).background(bg).clickable { onSel(i) },
                 contentAlignment = Alignment.Center) { Icon(icon, label, tint = fg) }
         }
+    }
     }
 }
 

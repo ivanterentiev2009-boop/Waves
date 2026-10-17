@@ -65,8 +65,8 @@ fun Controls(c: MediaController?, playing: Boolean) {
 @Composable
 fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
     val pos = rememberPosition(c, np.playing, 100)
-    Column(Modifier.fillMaxWidth().padding(12.dp).panel(RoundedCornerShape(Style.corner.dp), refract = true)
-        .clickable(onClick = onOpen).padding(10.dp)) {
+    Frosted(RoundedCornerShape(Style.corner.dp), Modifier.fillMaxWidth().padding(12.dp), refract = true) {
+    Column(Modifier.clickable(onClick = onOpen).padding(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Cover(np.art, 52); Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -82,6 +82,7 @@ fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
                 val f = if (d > 0) (pos.value.toFloat() / d).coerceIn(0f, 1f) else 0f
                 drawRect(Color(Style.accent), size = Size(size.width * f, size.height))
             })
+    }
     }
 }
 

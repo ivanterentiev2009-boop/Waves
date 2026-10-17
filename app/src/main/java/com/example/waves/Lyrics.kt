@@ -234,7 +234,7 @@ private fun SeekBar(c: MediaController?, pos: State<Long>) {
 }
 
 @Composable
-private fun EmptyLyrics(status: String, np: NowPlaying) {
+fun EmptyLyrics(status: String, np: NowPlaying) {
     val ctx = LocalContext.current
     val id = np.id
     Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -264,7 +264,7 @@ private fun EmptyLyrics(status: String, np: NowPlaying) {
 
 /** Правка строки: время слов сохраняется (пересчитывается, если число слов изменилось). */
 @Composable
-private fun EditLineDialog(ctx: android.content.Context, id: String?, lines: List<LyricLine>, i: Int, onClose: () -> Unit) {
+fun EditLineDialog(ctx: android.content.Context, id: String?, lines: List<LyricLine>, i: Int, onClose: () -> Unit) {
     var text by remember(i) { mutableStateOf(lines[i].text) }
     fun commit(newText: String?) {
         if (id != null) {
