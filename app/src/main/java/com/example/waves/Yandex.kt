@@ -63,6 +63,21 @@ object YState {
 @Composable
 fun WaveFeeder(c: MediaController?, np: NowPlaying) {
     var busy by remember { mutableStateOf(false) }
+    var lastId by remember { mutableStateOf<String?>(null) }
+    var lastStart by remember { mutableLongStateOf(0L) }
+    // рассказываем Яндексу, что слушаем и что пропускаем: так волна подстраивается и не повторяется
+    LaunchedEffect(np.id, Wave.active) {
+        val id = np.id
+        if (!Wave.active) { lastId = null; return@LaunchedEffect }
+        if (id == null || !id.startsWith("ym") || id == lastId) return@LaunchedEffect
+        val prev = lastId
+        val secs = (System.currentTimeMillis() - lastStart) / 1000.0
+        lastId = id; lastStart = System.currentTimeMillis()
+        withContext(Dispatchers.IO) {
+            if (prev != null) YandexApi.waveFeedback(Wave.station, if (secs < 15) "skip" else "trackFinished", prev.removePrefix("ym"), secs)
+            YandexApi.waveFeedback(Wave.station, "trackStarted", id.removePrefix("ym"))
+        }
+    }
     LaunchedEffect(np.index, Wave.active, c) {
         val ctl = c ?: return@LaunchedEffect
         if (!Wave.active || busy || ctl.mediaItemCount == 0) return@LaunchedEffect

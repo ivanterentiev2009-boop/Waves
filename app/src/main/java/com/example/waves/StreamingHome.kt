@@ -219,6 +219,16 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
         }
         err?.let { item { Text(it, Modifier.padding(20.dp, 4.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) } }
         item { RecentCard(onRecent) }
+        if (Recent.list.isNotEmpty()) {
+            item { Text("Вы слушали", Modifier.padding(start = 20.dp, top = 22.dp, bottom = 10.dp),
+                color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            item {
+                val rl = Recent.list.take(15)
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    itemsIndexed(rl, key = { _, t -> t.id }) { i, t -> WaveCard(t) { startPlay(rl, i) } }
+                }
+            }
+        }
         if (upcoming.isNotEmpty()) {
             item { Text(if (YState.wave.isNotEmpty()) "Дальше в волне" else "Из понравившегося", Modifier.padding(start = 20.dp, top = 22.dp, bottom = 10.dp),
                 color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold) }

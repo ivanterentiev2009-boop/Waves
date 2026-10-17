@@ -38,14 +38,15 @@ object YandexApi {
     }
     fun logout() = saveToken("")
 
-    private fun request(url: String, post: String? = null, auth: Boolean = true): String {
+    private fun request(url: String, post: String? = null, auth: Boolean = true,
+                        contentType: String = "application/x-www-form-urlencoded"): String {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 15000; c.readTimeout = 20000
         if (auth) c.setRequestProperty("Authorization", "OAuth $token")
         c.setRequestProperty("X-Yandex-Music-Client", "YandexMusicAndroid/24023231")
         if (post != null) {
             c.requestMethod = "POST"; c.doOutput = true
-            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            c.setRequestProperty("Content-Type", contentType)
             c.outputStream.use { it.write(post.toByteArray()) }
         }
         val code = c.responseCode
@@ -137,11 +138,48 @@ object YandexApi {
         return out.distinctBy { it.id }
     }
 
-    /** «Моя волна»: бесконечная подборка. afterId — последний трек очереди, чтобы получить продолжение. */
-    fun wave(afterId: String? = null, station: String = "user:onyourwave"): List<Track> {
+    private var batchId = ""
+
+    private fun fetchWave(station: String, afterId: String?): List<Track> {
         val q = if (afterId != null) "&queue=$afterId" else ""
-        val seq = json("$BASE/rotor/station/$station/tracks?settings2=true$q").getJSONObject("result").getJSONArray("sequence")
+        val res = json("$BASE/rotor/station/$station/tracks?settings2=true$q").getJSONObject("result")
+        res.optString("batchId").takeIf { it.isNotBlank() }?.let { batchId = it }
+        val seq = res.getJSONArray("sequence")
         return (0 until seq.length()).mapNotNull { i -> seq.getJSONObject(i).optJSONObject("track")?.let { parse(it) } }.distinctBy { it.id }
+    }
+
+    /**
+     * Сообщает станции, что мы делаем: начали волну, начали или закончили трек, пропустили. Без этого Яндекс
+     * не знает, что мы слушаем, и подборка каждый раз почти одна и та же. Ошибки игнорируются.
+     */
+    fun waveFeedback(station: String, type: String, trackId: String? = null, seconds: Double = 0.0) {
+        try {
+            val o = JSONObject().put("type", type)
+                .put("timestamp", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US).format(java.util.Date()))
+            if (trackId != null) o.put("trackId", trackId)
+            if (type == "trackFinished" || type == "skip") o.put("totalPlayedSeconds", seconds)
+            if (type == "radioStarted") o.put("from", "radio-mobile-" + station.replace(":", "-") + "-default")
+            if (batchId.isNotBlank() && type != "radioStarted") o.put("batchId", batchId)
+            request("$BASE/rotor/station/$station/feedback", o.toString(), contentType = "application/json")
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * «Моя волна»: бесконечная подборка. afterId — последний трек очереди, чтобы получить продолжение.
+     * При новом запуске сообщаем станции о старте, а если начало совпало с прошлым запуском, берём продолжение.
+     */
+    fun wave(afterId: String? = null, station: String = "user:onyourwave"): List<Track> {
+        if (afterId == null) waveFeedback(station, "radioStarted")
+        var out = fetchWave(station, afterId)
+        if (afterId == null && out.isNotEmpty()) {
+            val prev = sp?.getString("wavehead_$station", "").orEmpty().split(",")
+            if (out.take(3).any { it.id in prev }) {
+                val more = try { fetchWave(station, out.last().id.removePrefix("ym")) } catch (_: Exception) { emptyList() }
+                if (more.isNotEmpty()) out = more
+            }
+            sp?.edit()?.putString("wavehead_$station", out.take(3).joinToString(",") { it.id })?.apply()
+        }
+        return out
     }
 
     /** Идентификатор первого исполнителя трека: нужен для «Моей волны по артисту». */
