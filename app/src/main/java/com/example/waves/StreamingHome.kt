@@ -89,7 +89,7 @@ object Recent {
 }
 
 @Composable
-private fun ArtFill(uri: Uri?) {
+internal fun ArtFill(uri: Uri?) {
     if (uri != null) AsyncImage(uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(Style.accent).copy(0.5f), Color(0xFFFF8AD8).copy(0.4f)))),
         contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(48.dp), tint = Color.White) }
@@ -181,7 +181,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     val heroArt = if (Wave.active && np.art != null) np.art else source.firstOrNull()?.art
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
         item {
-            WaveHome(np, heroArt, source.drop(1).map { it.art }, np.playing && Wave.active, loading,
+            WaveHero(np, heroArt, source.drop(1).map { it.art }, np.playing && Wave.active, loading,
                 onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() },
                 onOverlay = {
                     if (Settings.canDrawOverlays(ctx)) ctx.startForegroundService(Intent(ctx, OverlayService::class.java))
@@ -204,58 +204,6 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun WaveHome(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: Boolean, loading: Boolean,
-                     onToggle: () -> Unit, onOverlay: () -> Unit) {
-    val accent = Color(Style.accent)
-    val bob = rememberInfiniteTransition(label = "h").animateFloat(0f, (2 * PI).toFloat(),
-        infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "bob")
-    val bars = VizBus.bars.collectAsState()
-    Box(Modifier.fillMaxWidth().height(450.dp)) {
-        // волнистая лента на фоне
-        Canvas(Modifier.fillMaxSize()) {
-            val path = Path(); val steps = 50
-            for (s in 0..steps) {
-                val x = size.width * s / steps
-                val y = size.height * 0.56f + sin(s * 0.22f + bob.value) * 34.dp.toPx() - (x / size.width) * 150.dp.toPx()
-                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            drawPath(path, Color.White.copy(0.09f), style = Stroke(34.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            drawPath(path, accent.copy(0.20f), style = Stroke(12.dp.toPx(), cap = StrokeCap.Round))
-        }
-        Text("Моя\nволна", Modifier.padding(start = 20.dp, top = 12.dp), color = Color.White, fontSize = 76.sp,
-            lineHeight = 74.sp, fontWeight = FontWeight.Black)
-        IconButton(onOverlay, Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 6.dp)) {
-            Icon(Icons.Default.PictureInPicture, "Оверлей", tint = Color.White)
-        }
-        Box(Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 190.dp).size(176.dp)
-            .graphicsLayer { translationY = sin(bob.value) * 6.dp.toPx(); rotationZ = -3f }
-            .clip(RoundedCornerShape(40.dp)).background(Color(0x22FFFFFF))) { ArtFill(art) }
-        Box(Modifier.align(Alignment.TopEnd).padding(end = 20.dp, top = 76.dp).size(96.dp)
-            .graphicsLayer { translationY = sin(bob.value + 1.5f) * 7.dp.toPx(); rotationZ = 6f }
-            .clip(RoundedCornerShape(26.dp)).background(Color(0x22FFFFFF))) { ArtFill(extra.getOrNull(0)) }
-        Box(Modifier.align(Alignment.TopEnd).padding(end = 84.dp, top = 188.dp).size(84.dp)
-            .graphicsLayer { translationY = sin(bob.value + 3f) * 7.dp.toPx(); rotationZ = -5f }
-            .clip(RoundedCornerShape(24.dp)).background(Color(0x22FFFFFF))) { ArtFill(extra.getOrNull(1)) }
-        Row(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, bottom = 54.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (playing && np.title != null) np.title else "Бесконечная подборка", color = Color.White.copy(0.9f),
-                style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.widthIn(max = 200.dp))
-        }
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 22.dp, bottom = 14.dp).size(104.dp)
-            .graphicsLayer {
-                val b = bars.value
-                val e = if (playing && b.isNotEmpty()) b.average().toFloat() else 0f
-                scaleX = 1f + e * 0.18f; scaleY = 1f + e * 0.18f
-            }
-            .clip(CircleShape).background(accent).clickable(onClick = onToggle), contentAlignment = Alignment.Center) {
-            if (loading) CircularProgressIndicator(Modifier.size(38.dp), color = Color.Black, strokeWidth = 3.dp)
-            else Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(54.dp), tint = Color.Black)
         }
     }
 }

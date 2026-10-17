@@ -224,7 +224,7 @@ private fun LookPage(onBack: () -> Unit) {
 @Composable
 private fun WavePage(onBack: () -> Unit) {
     Page("Моя волна", onBack) {
-        Hint("Вид меняется сразу: Яндекс Музыка → Моя волна.")
+        Hint("Вид меняется сразу на главной вкладке «Волна». Нужен вход в Яндекс Музыку.")
         Group {
             WAVE_STYLES.forEachIndexed { i, (name, desc) ->
                 val sel = Style.waveStyle == i

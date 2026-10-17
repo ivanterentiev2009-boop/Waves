@@ -167,9 +167,8 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                     }
                     LazyColumn(Modifier.weight(1f)) {
                         item {
-                            WaveHero(np, Wave.active, loading,
-                                onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() },
-                                onStop = { Wave.active = false })
+                            WaveHero(np, if (Wave.active) np.art else null, emptyList(), np.playing && Wave.active, loading,
+                                onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() })
                         }
                         if (upcoming.isNotEmpty()) {
                             item { Text("Дальше в волне", Modifier.padding(start = 20.dp, top = 8.dp, bottom = 10.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
