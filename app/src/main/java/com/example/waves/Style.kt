@@ -47,7 +47,7 @@ object Style {
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
-    const val BUILD = "r12"
+    const val BUILD = "r13"
     var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
     var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var ovScale by mutableFloatStateOf(1f)     // редактор оверлея
@@ -72,12 +72,12 @@ object Style {
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
         ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
-        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws", 0).coerceIn(0, 2); layout = s.getInt("lay", 1)
+        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws3", 0).coerceIn(0, 2); layout = s.getInt("lay", 1)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
             ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)
-            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws", waveStyle)?.putInt("lay", layout)?.apply()
+            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws3", waveStyle)?.putInt("lay", layout)?.apply()
     }
 }
 

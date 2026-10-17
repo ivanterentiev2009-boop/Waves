@@ -159,30 +159,58 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     if (YandexApi.token.isBlank()) { YandexTab(c, np, startPlay, Modifier.fillMaxSize(), showTabs = false); return }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var loading by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(YandexApi.token) {
         if (YState.likes.isEmpty()) try { YState.likes = withContext(Dispatchers.IO) { YandexApi.likes() } } catch (_: Exception) { }
-    }
-    fun startWave() {
-        scope.launch {
-            loading = true; err = null
-            try {
-                val l = withContext(Dispatchers.IO) { YandexApi.wave() }
-                if (l.isEmpty()) err = "Волна пока пуста" else { YState.wave = l; startPlay(l, 0); Wave.active = true }
-            } catch (e: Exception) { err = "Ошибка: ${e.message}" }
-            loading = false
-        }
     }
     val cur = np.id ?: ""
     val source = if (YState.wave.isNotEmpty()) YState.wave else YState.likes
     val idx = source.indexOfFirst { it.id == cur }
     val upcoming = (if (Wave.active && idx >= 0) source.drop(idx + 1) else source).take(12)
     val heroArt = if (Wave.active && np.art != null) np.art else source.firstOrNull()?.art
+    // трек, от которого строятся волны по артисту и по песне: текущий или первый из понравившихся
+    val seedLive = np.id?.startsWith("ym") == true
+    val seedId: String? = if (seedLive) np.id else source.firstOrNull()?.id
+    val seedTitle: String? = if (seedLive) np.title else source.firstOrNull()?.title
+    val seedArtist: String? = if (seedLive) np.artist else source.firstOrNull()?.artist
+    fun loadWave(resolve: suspend () -> String) {
+        scope.launch {
+            loading = true; err = null
+            try {
+                val station = resolve()
+                val l = withContext(Dispatchers.IO) { YandexApi.wave(null, station) }
+                if (l.isEmpty()) err = "Волна пока пуста" else { Wave.station = station; YState.wave = l; startPlay(l, 0); Wave.active = true }
+            } catch (e: Exception) { err = "Ошибка: ${e.message}" }
+            loading = false
+        }
+    }
+    fun startStation(kind: String) {
+        val sid = seedId?.removePrefix("ym")
+        if (kind != "wave" && sid == null) { err = "Сначала включи трек Яндекс Музыки"; return }
+        loadWave {
+            when (kind) {
+                "artist" -> "artist:" + (withContext(Dispatchers.IO) { YandexApi.trackArtistId(sid.orEmpty()) }
+                    ?: throw IllegalStateException("не удалось найти исполнителя"))
+                "song" -> "track:" + sid.orEmpty()
+                else -> "user:onyourwave"
+            }
+        }
+    }
+    fun shake() = loadWave { Wave.station }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
         item {
             WaveHero(np, heroArt, source.drop(1).map { it.art }, np.playing && Wave.active, loading,
-                onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() },
+                onToggle = { if (!Wave.active) startStation("wave") else if (np.playing) c?.pause() else c?.play() },
+                artistName = seedArtist, songName = seedTitle,
+                activeKind = if (!Wave.active) null else when {
+                    Wave.station.startsWith("artist:") -> "artist"
+                    Wave.station.startsWith("track:") -> "song"
+                    else -> "wave"
+                },
+                onStation = { startStation(it) },
+                onShake = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); shake() },
                 onOverlay = {
                     if (Settings.canDrawOverlays(ctx)) ctx.startForegroundService(Intent(ctx, OverlayService::class.java))
                     else ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))

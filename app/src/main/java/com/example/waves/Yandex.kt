@@ -38,7 +38,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Включена ли «Моя волна»: пока да, очередь сама пополняется новыми треками. */
-object Wave { var active by mutableStateOf(false) }
+object Wave {
+    var active by mutableStateOf(false)
+    var station by mutableStateOf("user:onyourwave")   // user:onyourwave, artist:ID или track:ID
+}
 
 /** Состояние раздела Яндекса живёт здесь, чтобы не сбрасываться при переключении вкладок. */
 object YState {
@@ -67,7 +70,7 @@ fun WaveFeeder(c: MediaController?, np: NowPlaying) {
             busy = true
             try {
                 val last = ctl.getMediaItemAt(ctl.mediaItemCount - 1).mediaId.removePrefix("ym")
-                val more = withContext(Dispatchers.IO) { YandexApi.wave(last) }
+                val more = withContext(Dispatchers.IO) { YandexApi.wave(last, Wave.station) }
                 val have = (0 until ctl.mediaItemCount).map { ctl.getMediaItemAt(it).mediaId }.toSet()
                 val fresh = more.filter { it.id !in have }
                 if (fresh.isNotEmpty()) { ctl.addMediaItems(fresh.map { it.toMediaItem() }); YState.wave = YState.wave + fresh }
@@ -109,7 +112,7 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
     fun startWave() = launchIO {
         val l = withContext(Dispatchers.IO) { YandexApi.wave() }
         if (l.isEmpty()) status = "Волна пока пуста"
-        else { YState.wave = l; onPlay(l, 0); Wave.active = true }
+        else { Wave.station = "user:onyourwave"; YState.wave = l; onPlay(l, 0); Wave.active = true }
     }
     fun openArtist(id: String) {
         YState.profileId = id; YState.profile = null; YState.profileError = null

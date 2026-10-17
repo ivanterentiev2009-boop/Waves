@@ -138,10 +138,16 @@ object YandexApi {
     }
 
     /** «Моя волна»: бесконечная подборка. afterId — последний трек очереди, чтобы получить продолжение. */
-    fun wave(afterId: String? = null): List<Track> {
+    fun wave(afterId: String? = null, station: String = "user:onyourwave"): List<Track> {
         val q = if (afterId != null) "&queue=$afterId" else ""
-        val seq = json("$BASE/rotor/station/user:onyourwave/tracks?settings2=true$q").getJSONObject("result").getJSONArray("sequence")
+        val seq = json("$BASE/rotor/station/$station/tracks?settings2=true$q").getJSONObject("result").getJSONArray("sequence")
         return (0 until seq.length()).mapNotNull { i -> seq.getJSONObject(i).optJSONObject("track")?.let { parse(it) } }.distinctBy { it.id }
+    }
+
+    /** Идентификатор первого исполнителя трека: нужен для «Моей волны по артисту». */
+    fun trackArtistId(id: String): String? {
+        val r = json("$BASE/tracks", "track-ids=$id").getJSONArray("result")
+        return r.optJSONObject(0)?.optJSONArray("artists")?.optJSONObject(0)?.opt("id")?.toString()
     }
 
     /** Блокирующий вызов: вызывается из загрузчика ExoPlayer (не из UI-потока). */
