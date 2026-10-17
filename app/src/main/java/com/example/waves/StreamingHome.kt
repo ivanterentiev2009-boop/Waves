@@ -124,10 +124,7 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
                 recentOpen -> RecentScreen(np, startPlay) { recentOpen = false }
                 nav == 0 -> HomeTab(c, np, startPlay) { recentOpen = true }
                 nav == 1 -> CollectionTab(np, device, startPlay)
-                else -> {
-                    LaunchedEffect(Unit) { YState.section = 1 }
-                    YandexTab(c, np, startPlay, Modifier.fillMaxSize().padding(bottom = 190.dp), showTabs = false)
-                }
+                else -> SourcesTab(c, np, startPlay, Modifier.fillMaxSize().padding(bottom = 190.dp))
             }
         }
         Column(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) {
