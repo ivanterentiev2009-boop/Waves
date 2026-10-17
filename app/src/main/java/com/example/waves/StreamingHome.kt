@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
 import coil.compose.AsyncImage
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,8 +115,11 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
     }
     BackHandler(enabled = recentOpen) { recentOpen = false }
 
+    val haze = LocalHaze.current
+    // всё, что прокручивается под нижними панелями (обложки, списки), размывается ими
+    val src = if (Style.theme == 3 && haze != null) Modifier.hazeSource(haze, zIndex = 1f) else Modifier
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().statusBarsPadding()) {
+        Box(Modifier.fillMaxSize().then(src).statusBarsPadding()) {
             when {
                 recentOpen -> RecentScreen(np, startPlay) { recentOpen = false }
                 nav == 0 -> HomeTab(c, np, startPlay) { recentOpen = true }

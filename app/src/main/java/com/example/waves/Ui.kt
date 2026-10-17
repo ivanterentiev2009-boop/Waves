@@ -65,8 +65,8 @@ fun Controls(c: MediaController?, playing: Boolean) {
 @Composable
 fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
     val pos = rememberPosition(c, np.playing, 100)
-    Column(Modifier.fillMaxWidth().padding(12.dp).panel(RoundedCornerShape(Style.corner.dp), refract = true)
-        .clickable(onClick = onOpen).padding(10.dp)) {
+    Frosted(RoundedCornerShape(Style.corner.dp), Modifier.fillMaxWidth().padding(12.dp), refract = true) {
+    Column(Modifier.clickable(onClick = onOpen).padding(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Cover(np.art, 52); Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -82,6 +82,7 @@ fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
                 val f = if (d > 0) (pos.value.toFloat() / d).coerceIn(0f, 1f) else 0f
                 drawRect(Color(Style.accent), size = Size(size.width * f, size.height))
             })
+    }
     }
 }
 
@@ -99,10 +100,12 @@ fun Pill(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier
 }
 
 @Composable
-fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifier: Modifier = Modifier,
+              currentId: String? = null, footer: (@Composable () -> Unit)? = null) {
     LazyColumn(modifier, contentPadding = PaddingValues(12.dp, 4.dp, 12.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         itemsIndexed(tracks, key = { _, t -> t.id }) { i, t ->
-            val bg by animateColorAsState(if (i == current) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(300), label = "rb")
+            val sel = if (currentId != null) t.id == currentId else i == current
+            val bg by animateColorAsState(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(300), label = "rb")
             Row(Modifier.animateItem().fillMaxWidth().clip(RoundedCornerShape((Style.corner * 0.7f).dp))
                 .background(bg).clickable { onClick(i) }.padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
@@ -111,9 +114,10 @@ fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifie
                     Text(t.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(t.artist, color = dim, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (i == current) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
+                if (sel) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
             }
         }
+        footer?.let { f -> item { f() } }
     }
 }
 
@@ -123,6 +127,7 @@ fun Equalizer(modifier: Modifier = Modifier, playing: Boolean) {
     val barsState = VizBus.bars.collectAsState()
     val bottom = Color(Style.accent); val top = lerp(bottom, Color.White, 0.55f)
     Canvas(modifier) {
+        if (!playing) return@Canvas
         val bars = barsState.value
         val n = bars.size
         val gap = size.width / n * 0.4f
@@ -178,7 +183,7 @@ private fun BubbleView(np: NowPlaying, onTap: () -> Unit) {
 
 @Composable
 private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMode: (OvMode) -> Unit, onZone: (android.graphics.Rect?) -> Unit, onClose: () -> Unit) {
-    val lyr = rememberLyrics(np.id)
+    val lyr = rememberLyrics(np.id, np.title, np.artist, c)
     var tab by remember { mutableIntStateOf(0) }
     val pos = rememberPosition(c, np.playing && lyr.lines.isNotEmpty(), if (full && tab == 1) 80 else 250)
     val synced = lyr.lines.any { it.timeMs != null }
@@ -231,7 +236,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
                             Text(lyr.status, color = Color(0xB3FFFFFF), fontSize = 13.sp)
                         }
                     } else LazyColumn(Modifier.height(200.dp), state = ls, contentPadding = PaddingValues(vertical = 60.dp, horizontal = 4.dp)) {
-                        itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, false, pos, lyr.lines.getOrNull(i + 1)?.timeMs) { c?.seekTo(l.timeMs!!) } }
+                        itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, false, pos, lyr.lines.getOrNull(i + 1)?.timeMs, {}) { c?.seekTo(l.timeMs!!) } }
                     }
                 }
             }
