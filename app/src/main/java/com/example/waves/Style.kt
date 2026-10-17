@@ -153,6 +153,10 @@ fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false)
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(0.55f), Color.White.copy(0.04f), Color.White.copy(0.25f))), shape)
         1 -> this.clip(shape).background(Color(0xFF17171C).copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.07f), shape)
+        3 -> this.clip(shape)          // матовое стекло: молочная панель без преломления
+            .background(Color(0xFF16161D).copy(alpha = 0.45f * strength))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(0.16f + Style.glass * 0.5f), Color.White.copy(0.08f + Style.glass * 0.3f))))
+            .border(1.dp, Color.White.copy(0.20f), shape)
         else -> this.clip(shape).background(Color.Black.copy(alpha = strength))
             .border(1.dp, Color.White.copy(0.10f), shape)
     }
@@ -169,6 +173,14 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.30f), Color.Transparent), Offset(900f, 1500f), 900f)))
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.28f), Color.Transparent), Offset(100f, 2000f), 900f)))
                 if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 5.dp else 70.dp).alpha(if (glassCapable) 0.85f else 0.5f), contentScale = ContentScale.Crop)
+            }
+        } else if (Style.theme == 3) {
+            val a = Color(Style.accent)
+            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(a.copy(0.42f), Color(0xFF14141B), a.copy(0.22f)))))
+            if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(70.dp).alpha(0.55f), contentScale = ContentScale.Crop)
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val rnd = kotlin.random.Random(3)
+                repeat(500) { drawCircle(Color.White.copy(0.04f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
             }
         }
         content()

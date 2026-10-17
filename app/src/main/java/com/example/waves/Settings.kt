@@ -42,10 +42,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
             Text("Сборка ${Style.BUILD}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
             Card("Тема") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Стекло", "Минимализм", "AMOLED").forEachIndexed { i, n ->
-                        FilterChip(Style.theme == i, { Style.theme = i; Style.save() }, { Text(n) })
-                    }
+                val names = listOf("Стекло", "Матовое стекло", "Минимализм", "AMOLED")
+                val ids = listOf(0, 3, 1, 2)
+                for (rowStart in listOf(0, 2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (k in rowStart..rowStart + 1) FilterChip(Style.theme == ids[k], { Style.theme = ids[k]; Style.save() }, { Text(names[k]) })
                 }
             }
             Card("Акцентный цвет") {

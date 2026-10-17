@@ -50,6 +50,10 @@ object YState {
     var lastQ by mutableStateOf("")
     var page by mutableIntStateOf(0)
     var more by mutableStateOf(false)
+    var artists by mutableStateOf<List<ArtistItem>>(emptyList())
+    var profileId by mutableStateOf<String?>(null)
+    var profile by mutableStateOf<ArtistProfile?>(null)
+    var profileError by mutableStateOf<String?>(null)
 }
 
 /** Подгружает следующие треки волны, когда в очереди остаётся три и меньше. */
@@ -94,17 +98,27 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
     fun search(reset: Boolean) = launchIO {
         val q = YState.query.trim()
         YState.lastQ = q
-        if (q.length < 2) { YState.results = emptyList(); YState.more = false; return@launchIO }
+        if (q.length < 2) { YState.results = emptyList(); YState.artists = emptyList(); YState.more = false; return@launchIO }
         val page = if (reset) 0 else YState.page + 1
+        if (reset) YState.artists = withContext(Dispatchers.IO) { try { YandexApi.searchArtists(q) } catch (_: Exception) { emptyList() } }
         val r = withContext(Dispatchers.IO) { YandexApi.search(q, page) }
         YState.results = if (reset) r else YState.results + r.filter { n -> YState.results.none { it.id == n.id } }
         YState.page = page; YState.more = r.size >= 10
-        if (YState.results.isEmpty()) status = "Ничего не найдено"
+        if (YState.results.isEmpty() && YState.artists.isEmpty()) status = "Ничего не найдено"
     }
     fun startWave() = launchIO {
         val l = withContext(Dispatchers.IO) { YandexApi.wave() }
         if (l.isEmpty()) status = "Волна пока пуста"
         else { YState.wave = l; onPlay(l, 0); Wave.active = true }
+    }
+    fun openArtist(id: String) {
+        YState.profileId = id; YState.profile = null; YState.profileError = null
+        scope.launch {
+            try {
+                val p = withContext(Dispatchers.IO) { YandexApi.artistProfile(id) }
+                if (YState.profileId == id) YState.profile = p
+            } catch (e: Exception) { if (YState.profileId == id) YState.profileError = "Ошибка: ${e.message}" }
+        }
     }
     LaunchedEffect(YandexApi.token) { if (YandexApi.token.isNotBlank() && YState.likes.isEmpty()) loadLikes() }
     // поиск по мере ввода, с небольшой задержкой
@@ -127,6 +141,16 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                 OutlinedTextField(input, { input = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Адрес или токен") })
                 Button({ if (input.isNotBlank()) YandexApi.saveToken(input) }, enabled = input.isNotBlank()) { Text("Войти") }
             }
+        } else if (YState.profileId != null) {
+            ArtistScreen(cur, onBack = { YState.profileId = null; YState.profile = null },
+                onPlay = onPlay, onOpenArtist = { openArtist(it) },
+                onAlbum = { al ->
+                    launchIO {
+                        val tr = withContext(Dispatchers.IO) { YandexApi.album(al.id) }
+                        if (tr.isNotEmpty()) onPlay(tr, 0)
+                    }
+                },
+                modifier = Modifier.weight(1f))
         } else {
             Pill(listOf("Моя волна", "Поиск", "Мне нравится"), YState.section,
                 { YState.section = it; status = null; if (it == 2 && YState.likes.isEmpty()) loadLikes() },
@@ -167,8 +191,20 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                         trailingIcon = { if (YState.query.isNotEmpty()) IconButton({ YState.query = "" }) { Icon(Icons.Default.Close, null) } },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { search(true) }))
-                    TrackList(YState.results, -1, { i -> onPlay(YState.results, i) }, Modifier.weight(1f), currentId = cur,
-                        footer = if (YState.more) ({ TextButton({ search(false) }, Modifier.fillMaxWidth()) { Text("Показать ещё") } }) else null)
+                    LazyColumn(Modifier.weight(1f)) {
+                        if (YState.artists.isNotEmpty()) {
+                            item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            item {
+                                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(YState.artists, key = { it.id }) { a -> ArtistChip(a) { openArtist(a.id) } }
+                                }
+                            }
+                            if (YState.results.isNotEmpty()) item { Text("Треки", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                        }
+                        itemsIndexed(YState.results, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == cur) { onPlay(YState.results, i) } }
+                        if (YState.more) item { TextButton({ search(false) }, Modifier.fillMaxWidth()) { Text("Показать ещё") } }
+                        item { Spacer(Modifier.height(16.dp)) }
+                    }
                 }
                 else -> {
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
