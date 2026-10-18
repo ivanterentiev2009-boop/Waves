@@ -359,7 +359,7 @@ fun LyricTicker(lyr: LyricsData, pos: State<Long>, show: Boolean, onClick: () ->
                 Text(karaoke(line.text, start, next ?: (start + 4000), pos.value, Color.White, Color.White.copy(0.45f), line.wordTimes),
                     Modifier.fillMaxWidth()
                         .clickable(noRipple, null, onClick = onClick)
-                        .basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 800, initialDelayMillis = 800),
+                        .basicMarquee(iterations = Int.MAX_VALUE),
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
             }
