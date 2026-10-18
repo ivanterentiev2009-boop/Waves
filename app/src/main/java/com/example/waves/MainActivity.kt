@@ -43,13 +43,13 @@ class MainActivity : ComponentActivity() {
             setContent { WavesTheme { CrashScreen(report) {
                 crashFile.delete()
                 Style.init(this); YandexApi.init(this)
-                setContent { WavesTheme { var st by remember { mutableStateOf(false) }; if (st) SettingsScreen { st = false } else Home { st = true } } }
+                setContent { WavesTheme { AppRoot() } }
             } } }
             return
         }
         Style.init(this)
         YandexApi.init(this)
-        setContent { WavesTheme { var st by remember { mutableStateOf(false) }; if (st) SettingsScreen { st = false } else Home { st = true } } }
+        setContent { WavesTheme { AppRoot() } }
     }
 }
 
@@ -100,3 +100,13 @@ fun Home(onSettings: () -> Unit) {
     }
 }
 
+
+/** Корень приложения: главный экран или настройки, а поверх них панель поиска. */
+@Composable
+private fun AppRoot() {
+    var st by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        if (st) SettingsScreen { st = false } else Home { st = true }
+        SearchOverlayHost()
+    }
+}

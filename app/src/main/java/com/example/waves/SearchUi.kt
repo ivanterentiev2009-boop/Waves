@@ -2,6 +2,7 @@ package com.example.waves
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -104,9 +105,10 @@ fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badg
               suggest: ((String) -> List<String>)?, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
     val ctx = LocalContext.current
     remember { SearchHistory.init(ctx) }
-    var open by remember { mutableStateOf(false) }
     Frosted(CircleShape, modifier.fillMaxWidth().height(56.dp)) {
-        Row(Modifier.fillMaxSize().clickable { open = true }.padding(start = 18.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxSize().clickable {
+            SearchHost.req = SearchReq(value, hint, badge, suggest) { q -> SearchHistory.add(q); onValueChange(q); onSearch() }
+        }.padding(start = 18.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Search, null, tint = Color.White.copy(0.7f))
             Spacer(Modifier.width(12.dp))
             Text(if (value.isBlank()) hint else value, Modifier.weight(1f),
@@ -116,9 +118,22 @@ fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badg
             else SourceBadge(badge)
         }
     }
-    if (open) SearchOverlay(value, hint, badge, suggest,
-        onSubmit = { q -> SearchHistory.add(q); onValueChange(q); onSearch(); open = false },
-        onDismiss = { open = false })
+}
+
+/** Запрос на показ панели поиска: её рисует SearchOverlayHost поверх всего приложения. */
+class SearchReq(val initial: String, val hint: String, val badge: String, val suggest: ((String) -> List<String>)?, val onSubmit: (String) -> Unit)
+
+object SearchHost { var req by mutableStateOf<SearchReq?>(null) }
+
+/** Ставится один раз в корне приложения. Панель живёт в том же окне, поэтому клавиатура её поднимает. */
+@Composable
+fun SearchOverlayHost() {
+    val r = SearchHost.req ?: return
+    key(r) {
+        SearchOverlay(r.initial, r.hint, r.badge, r.suggest,
+            onSubmit = { q -> r.onSubmit(q); SearchHost.req = null },
+            onDismiss = { SearchHost.req = null })
+    }
 }
 
 @Composable
@@ -148,9 +163,8 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
     }
     val shape = RoundedCornerShape(32.dp)
     val noRipple = remember { MutableInteractionSource() }
-    // decorFitsSystemWindows = false: окно получает размер клавиатуры сам, и imePadding поднимает панель над ней
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().clickable(interactionSource = noRipple, indication = null, onClick = onDismiss)) {
+    BackHandler(onBack = onDismiss)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.55f)).clickable(interactionSource = noRipple, indication = null, onClick = onDismiss)) {
             Column(Modifier.align(Alignment.BottomCenter).imePadding().navigationBarsPadding().padding(12.dp).fillMaxWidth()
                 .clip(shape).background(Color(0xF01E1E24)).border(1.dp, Color.White.copy(0.10f), shape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
@@ -190,5 +204,4 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                 }
             }
         }
-    }
 }
