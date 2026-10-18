@@ -24,11 +24,14 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         YandexApi.init(this)
+        SoundCloud.init(this)
         val http = DefaultDataSource.Factory(this)
         val resolving = ResolvingDataSource.Factory(http) { spec ->
-            if (spec.uri.scheme == "ymusic")
-                spec.withUri(Uri.parse(YandexApi.streamUrl(spec.uri.toString().removePrefix("ymusic://"))))
-            else spec
+            when (spec.uri.scheme) {
+                "ymusic" -> spec.withUri(Uri.parse(YandexApi.streamUrl(spec.uri.toString().removePrefix("ymusic://"))))
+                "scloud" -> spec.withUri(Uri.parse(SoundCloud.streamUrl("https://" + spec.uri.host + spec.uri.path, spec.uri.getQueryParameter("ta"))))
+                else -> spec
+            }
         }
         val p = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))

@@ -35,10 +35,12 @@ import java.security.MessageDigest
 
 private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-private fun httpGet(url: String): String {
+private const val BROWSER_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
+
+private fun httpGet(url: String, ua: String = "Waves/0.18"): String {
     val c = URL(url).openConnection() as HttpURLConnection
-    c.connectTimeout = 12000; c.readTimeout = 15000
-    c.setRequestProperty("User-Agent", "Waves/0.18")
+    c.connectTimeout = 12000; c.readTimeout = 20000
+    c.setRequestProperty("User-Agent", ua)
     val code = c.responseCode
     val body = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText().orEmpty()
     if (code !in 200..299) throw IOException("HTTP $code")
@@ -101,6 +103,80 @@ object Audius {
                 Uri.parse("$h/v1/tracks/$id/stream?app_name=Waves"),
                 o.optJSONObject("artwork")?.optString("480x480")?.takeIf { it.startsWith("http") }?.let { Uri.parse(it) })
         }.distinctBy { it.id }
+    }
+}
+
+/**
+ * SoundCloud: публичные треки, без входа. Использует тот же ключ, что и сайт soundcloud.com, поэтому
+ * неофициально: если сайт поменяется, ключ придётся получить заново (приложение делает это само).
+ * Платные треки Go+ отдают только 30-секундное превью.
+ */
+object SoundCloud {
+    private var sp: SharedPreferences? = null
+    private var cid = ""
+
+    fun init(ctx: Context) {
+        if (sp != null) return
+        val s = ctx.applicationContext.getSharedPreferences("soundcloud", 0); sp = s
+        cid = s.getString("cid", "").orEmpty()
+    }
+
+    private fun fetchClientId(): String {
+        val html = httpGet("https://soundcloud.com", BROWSER_UA)
+        val scripts = Regex("src=\"(https://a-v2\\.sndcdn\\.com/assets/[^\"]+\\.js)\"").findAll(html).map { it.groupValues[1] }.toList().reversed()
+        for (u in scripts) {
+            val m = Regex("client_id\\s*[:=]\\s*\"([A-Za-z0-9]{32})\"").find(httpGet(u, BROWSER_UA))
+            if (m != null) {
+                cid = m.groupValues[1]
+                sp?.edit()?.putString("cid", cid)?.apply()
+                return cid
+            }
+        }
+        throw IOException("не удалось получить ключ SoundCloud")
+    }
+
+    private fun clientId() = cid.ifBlank { fetchClientId() }
+
+    private inline fun <T> withKey(block: (String) -> T): T =
+        try { block(clientId()) } catch (_: Exception) { block(fetchClientId()) }
+
+    fun search(q: String): List<Track> = withKey { key ->
+        val body = if (q.isBlank())
+            httpGet("https://api-v2.soundcloud.com/charts?kind=top&genre=soundcloud%3Agenres%3Aall-music&limit=40&client_id=$key", BROWSER_UA)
+        else httpGet("https://api-v2.soundcloud.com/search/tracks?q=${enc(q)}&limit=40&client_id=$key", BROWSER_UA)
+        val a = JSONObject(body).optJSONArray("collection") ?: JSONArray()
+        (0 until a.length()).mapNotNull { i ->
+            val o = a.getJSONObject(i)
+            parse(o.optJSONObject("track") ?: o)
+        }.distinctBy { it.id }
+    }
+
+    private fun parse(o: JSONObject): Track? {
+        val id = o.optLong("id")
+        val policy = o.optString("policy")
+        if (id == 0L || policy == "BLOCK" || !o.optBoolean("streamable", true)) return null
+        val tr = o.optJSONObject("media")?.optJSONArray("transcodings") ?: return null
+        var url: String? = null
+        for (i in 0 until tr.length()) {
+            val t = tr.getJSONObject(i)
+            if (t.optJSONObject("format")?.optString("protocol") == "progressive") { url = t.optString("url"); break }
+        }
+        val u = Uri.parse(url ?: return null)
+        val ta = o.optString("track_authorization")
+        val uri = Uri.Builder().scheme("scloud").authority(u.host).path(u.path).apply {
+            if (ta.isNotBlank()) appendQueryParameter("ta", ta)
+        }.build()
+        val title = o.optString("title").ifBlank { "Без названия" } + if (policy == "SNIP") " (превью)" else ""
+        val user = o.optJSONObject("user")
+        val art = (o.optString("artwork_url").ifBlank { user?.optString("avatar_url").orEmpty() })
+            .takeIf { it.startsWith("http") }?.replace("-large", "-t500x500")
+        return Track("sc$id", title, user?.optString("username").orEmpty().ifBlank { "SoundCloud" }, uri, art?.let { Uri.parse(it) })
+    }
+
+    /** Блокирующий вызов из загрузчика плеера: прямая ссылка на поток (временная). */
+    fun streamUrl(base: String, ta: String?): String = withKey { key ->
+        val extra = if (ta.isNullOrBlank()) "" else "&track_authorization=${enc(ta)}"
+        JSONObject(httpGet("$base?client_id=$key$extra", BROWSER_UA)).getString("url")
     }
 }
 
@@ -173,13 +249,13 @@ object SrcState {
     fun reset(key: String) { panes.remove(key) }
 }
 
-private val SOURCE_NAMES = listOf("Яндекс", "Радио", "Audius", "Сервер", "Ссылка")
+private val SOURCE_NAMES = listOf("Яндекс", "Радио", "Audius", "SoundCloud", "Сервер", "Ссылка")
 
 /** Вкладка «Поиск»: переключатель источников музыки. */
 @Composable
 fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
-    remember { Subsonic.init(ctx) }
+    remember { Subsonic.init(ctx); SoundCloud.init(ctx) }
     Column(modifier) {
         Pill(SOURCE_NAMES, SrcState.src, { SrcState.src = it },
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp).horizontalScroll(rememberScrollState()))
@@ -190,7 +266,12 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
             }
             1 -> TrackPane("radio", "Название радиостанции", np, startPlay, Modifier.weight(1f)) { Radio.search(it) }
             2 -> TrackPane("audius", "Трек или исполнитель на Audius", np, startPlay, Modifier.weight(1f)) { Audius.search(it) }
-            3 -> if (Subsonic.configured) {
+            3 -> {
+                Text("Платные треки Go+ играют только 30-секундное превью.", Modifier.padding(horizontal = 20.dp),
+                    color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                TrackPane("sc", "Трек или исполнитель на SoundCloud", np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
+            }
+            4 -> if (Subsonic.configured) {
                 Row(Modifier.padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(Subsonic.url.substringAfter("://"), Modifier.weight(1f), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                     TextButton({ Subsonic.logout(); SrcState.reset("sub") }) { Text("Отключить") }
