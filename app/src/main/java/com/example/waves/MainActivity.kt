@@ -93,6 +93,7 @@ fun Home(onSettings: () -> Unit) {
         c?.run { setMediaItems(list.map { it.toMediaItem() }, i, 0); prepare(); play() }
     }
     WaveFeeder(c, np)
+    LyricsPrefetcher(c, np)
     Crossfade(showLyrics, animationSpec = tween(350), label = "screen") { lyr ->
     if (lyr) PlayerScreen(c, np, onArtist = { openArtistOf(scope, np) { showLyrics = false } }) { showLyrics = false } else AppBackground(np.art) {
         StreamingHome(c, np, tracks, startPlayTop, onSettings) { showLyrics = true }

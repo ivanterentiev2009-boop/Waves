@@ -146,6 +146,8 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
                 }
             }
 
+            // бегущая строка с текстом песни под обложкой
+            LyricTicker(lyr, pos, show = mode == 0, onClick = { mode = 1 })
             Text(np.title ?: "", Modifier.fillMaxWidth(), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // имя артиста открывает его страницу

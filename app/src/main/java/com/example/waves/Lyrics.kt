@@ -6,6 +6,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,36 +47,86 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-object LyricsCache { val map = HashMap<String, Pair<String, List<LyricLine>>>() }
+/**
+ * Тексты, найденные заранее. Хранятся только в памяти до закрытия приложения.
+ * misses: треки, для которых текст уже искали и не нашли (с сигнатурой настроек, чтобы после их смены искать снова).
+ */
+object LyricsCache {
+    val map = HashMap<String, Pair<String, List<LyricLine>>>()
+    val misses = HashMap<String, Pair<String, String>>()
+    private val inflight = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    fun sig() = "${Style.lyYandex}${Style.lyLrclib}${Style.lyOvh}"
+
+    /** Находит текст, если его ещё нет. Если этот трек уже ищет кто-то другой, просто ждёт его. */
+    suspend fun ensure(id: String, title: String?, artist: String?, durSec: Int?) {
+        if (map.containsKey(id) || misses[id]?.first == sig()) return
+        if (!inflight.add(id)) { while (inflight.contains(id)) delay(100); return }
+        try {
+            val notes = mutableListOf<String>()
+            val found = withContext(Dispatchers.IO) { LyricSources.find(id, title, artist, durSec, notes) }
+            if (found != null) map[id] = found else misses[id] = sig() to notes.joinToString("\n")
+        } finally { inflight.remove(id) }
+    }
+
+    fun peek(id: String): LyricsData? {
+        map[id]?.let { (src, l) -> if (l.isNotEmpty()) return LyricsData(l, "", src) }
+        misses[id]?.takeIf { it.first == sig() }?.let { (_, notes) ->
+            val hint = if (id.startsWith("ym")) "" else "\nМожно загрузить .lrc кнопкой сверху или распознать текст на устройстве."
+            return LyricsData(emptyList(), notes.ifBlank { "Текст не найден" } + hint)
+        }
+        return null
+    }
+}
+
 class LyricsData(val lines: List<LyricLine>, val status: String, val source: String = "")
 
 @Composable
 fun rememberLyrics(id: String?, title: String?, artist: String?, c: MediaController?): LyricsData {
     val ctx = LocalContext.current
-    var data by remember(id) { mutableStateOf(LyricsData(emptyList(), "Загрузка…")) }
+    // если текст уже найден заранее, он показывается с первого кадра
+    var data by remember(id) { mutableStateOf((if (id != null) LyricsCache.peek(id) else null) ?: LyricsData(emptyList(), "Загрузка…")) }
     LaunchedEffect(id, title, Transcriber.version, Style.lyYandex, Style.lyLrclib, Style.lyOvh) {
         if (id == null) { data = LyricsData(emptyList(), "Ничего не играет"); return@LaunchedEffect }
         // свои правки, загруженный файл или распознанный текст важнее всего остального
         val saved = withContext(Dispatchers.IO) { Transcriber.load(ctx, id) }
         if (saved != null && saved.isNotEmpty()) { data = LyricsData(saved, "", "мои правки / файл"); return@LaunchedEffect }
-        LyricsCache.map[id]?.let { (src, l) -> if (l.isNotEmpty()) { data = LyricsData(l, "", src); return@LaunchedEffect } }
+        LyricsCache.peek(id)?.let { data = it; return@LaunchedEffect }
         data = LyricsData(emptyList(), "Ищем текст…")
         // длительность нужна для точного поиска, ждём её не дольше секунды
         var durMs = c?.duration ?: -1L
         var tries = 0
         while (c != null && durMs <= 0 && tries < 10) { delay(100); durMs = c.duration; tries++ }
         val durSec = if (durMs > 0) (durMs / 1000).toInt() else null
-        val notes = mutableListOf<String>()
-        val found = withContext(Dispatchers.IO) { LyricSources.find(id, title, artist, durSec, notes) }
-        if (found != null) {
-            LyricsCache.map[id] = found
-            data = LyricsData(found.second, "", found.first)
-        } else {
-            val hint = if (id.startsWith("ym")) "" else "\nМожно загрузить .lrc кнопкой сверху или распознать текст на устройстве."
-            data = LyricsData(emptyList(), (notes.joinToString("\n").ifBlank { "Текст не найден" }) + hint)
-        }
+        LyricsCache.ensure(id, title, artist, durSec)
+        LyricsCache.peek(id)?.let { data = it }
     }
     return data
+}
+
+/**
+ * Ищет тексты заранее: для играющего трека и нескольких следующих в очереди. Когда открываешь текст,
+ * он уже найден и показывается сразу, без «Ищем текст…».
+ */
+@Composable
+fun LyricsPrefetcher(c: MediaController?, np: NowPlaying) {
+    LaunchedEffect(np.id, np.index, c, Style.lyYandex, Style.lyLrclib, Style.lyOvh) {
+        val ctrl = c ?: return@LaunchedEffect
+        val start = ctrl.currentMediaItemIndex
+        for (k in 0..3) {
+            val i = start + k
+            if (i >= ctrl.mediaItemCount) break
+            val item = ctrl.getMediaItemAt(i)
+            if (item.mediaId.isBlank()) continue
+            var durSec: Int? = null
+            if (k == 0) {   // у текущего трека ждём длительность для точного поиска
+                var tries = 0
+                while (ctrl.duration <= 0 && tries < 15) { delay(100); tries++ }
+                if (ctrl.duration > 0) durSec = (ctrl.duration / 1000).toInt()
+            }
+            LyricsCache.ensure(item.mediaId, item.mediaMetadata.title?.toString(), item.mediaMetadata.artist?.toString(), durSec)
+        }
+    }
 }
 
 @Composable
@@ -285,4 +337,32 @@ fun EditLineDialog(ctx: android.content.Context, id: String?, lines: List<LyricL
                 TextButton(onClose) { Text("Отмена") }
             }
         })
+}
+
+/**
+ * Бегущая строка под обложкой: текущая строка песни, слова подсвечиваются по ходу. Длинная строка плавно
+ * едет по кругу. Нажатие открывает полный текст. Для текста без таймкодов ничего не показывается.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LyricTicker(lyr: LyricsData, pos: State<Long>, show: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val lines = lyr.lines
+    val synced = lines.any { it.timeMs != null }
+    val active = rememberActive(lines, pos)
+    val noRipple = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Box(modifier.fillMaxWidth().height(36.dp), contentAlignment = Alignment.Center) {
+        if (show && synced) androidx.compose.animation.Crossfade(active.value, animationSpec = tween(220), label = "ticker") { idx ->
+            val line = lines.getOrNull(idx)
+            if (line != null && line.text.isNotBlank()) {
+                val start = line.timeMs ?: 0L
+                val next = lines.getOrNull(idx + 1)?.timeMs
+                Text(karaoke(line.text, start, next ?: (start + 4000), pos.value, Color.White, Color.White.copy(0.45f), line.wordTimes),
+                    Modifier.fillMaxWidth()
+                        .clickable(noRipple, null, onClick = onClick)
+                        .basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 800, initialDelayMillis = 800),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+            }
+        }
+    }
 }
