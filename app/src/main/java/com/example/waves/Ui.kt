@@ -3,6 +3,7 @@ package com.example.waves
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -251,7 +252,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
 @Composable
 fun SearchField(value: String, onValueChange: (String) -> Unit, hint: String, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val focused by androidx.compose.foundation.interaction.collectIsFocusedAsState(interaction)
+    val focused by interaction.collectIsFocusedAsState()
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val accent = Color(Style.accent)
     val ring by animateColorAsState(if (focused) accent else Color.Transparent, tween(250), label = "sfr")
