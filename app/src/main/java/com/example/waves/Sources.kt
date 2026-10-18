@@ -37,10 +37,11 @@ private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
 private const val BROWSER_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
 
-private fun httpGet(url: String, ua: String = "Waves/0.18"): String {
+private fun httpGet(url: String, ua: String = "Waves/0.18", headers: Map<String, String> = emptyMap()): String {
     val c = URL(url).openConnection() as HttpURLConnection
     c.connectTimeout = 12000; c.readTimeout = 20000
     c.setRequestProperty("User-Agent", ua)
+    headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
     val code = c.responseCode
     val body = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText().orEmpty()
     if (code !in 200..299) throw IOException("HTTP $code")
@@ -86,7 +87,7 @@ object SoundCloud {
     fun refreshAuto(): String = fetchClientId()
 
     /** Блокирующий вызов: проверить, что ключ работает. Бросает исключение, если нет. */
-    fun check() { httpGet("https://api-v2.soundcloud.com/search/tracks?q=a&limit=1&client_id=$cid", BROWSER_UA) }
+    fun check() { get("https://api-v2.soundcloud.com/search/tracks?q=a&limit=1&client_id=$cid") }
 
     private fun fetchClientId(): String {
         val html = httpGet("https://soundcloud.com", BROWSER_UA)
@@ -103,13 +104,35 @@ object SoundCloud {
 
     private fun clientId() = cid.ifBlank { fetchClientId() }
 
-    private inline fun <T> withKey(block: (String) -> T): T =
-        try { block(clientId()) } catch (_: Exception) { block(fetchClientId()) }
+    // заголовки, как у сайта: без них API иногда отвечает отказом
+    private val apiHeaders = mapOf("Origin" to "https://soundcloud.com", "Referer" to "https://soundcloud.com/",
+        "Accept" to "application/json, text/javascript, */*; q=0.01")
+    private fun get(url: String) = httpGet(url, BROWSER_UA, apiHeaders)
+    private fun isAuthError(e: Exception) = e.message.orEmpty().let { "HTTP 401" in it || "HTTP 403" in it }
+
+    /** Выполняет запрос с ключом. Новый ключ ищем, только если сайт отказал по доступу, иначе показываем настоящую ошибку. */
+    private inline fun <T> withKey(block: (String) -> T): T {
+        var first: Exception? = null
+        if (cid.isNotBlank()) {
+            try { return block(cid) } catch (e: Exception) {
+                if (!isAuthError(e)) throw e
+                first = e
+            }
+        }
+        val rejected = first
+        return try { block(fetchClientId()) } catch (e: Exception) {
+            throw IOException(if (rejected != null) "ключ отклонён (${rejected.message}), новый найти не удалось" else (e.message ?: "ошибка"))
+        }
+    }
 
     fun search(q: String): List<Track> = withKey { key ->
-        val body = if (q.isBlank())
-            httpGet("https://api-v2.soundcloud.com/charts?kind=top&genre=soundcloud%3Agenres%3Aall-music&limit=40&client_id=$key", BROWSER_UA)
-        else httpGet("https://api-v2.soundcloud.com/search/tracks?q=${enc(q)}&limit=40&client_id=$key", BROWSER_UA)
+        val body = if (q.isBlank()) {
+            try { get("https://api-v2.soundcloud.com/charts?kind=top&genre=soundcloud%3Agenres%3Aall-music&limit=40&client_id=$key") }
+            catch (e: Exception) {
+                if (isAuthError(e)) throw e
+                get("https://api-v2.soundcloud.com/search/tracks?q=${enc("music")}&limit=40&client_id=$key")   // чарты недоступны: берём обычный поиск
+            }
+        } else get("https://api-v2.soundcloud.com/search/tracks?q=${enc(q)}&limit=40&client_id=$key")
         val a = JSONObject(body).optJSONArray("collection") ?: JSONArray()
         (0 until a.length()).mapNotNull { i ->
             val o = a.getJSONObject(i)
@@ -142,7 +165,7 @@ object SoundCloud {
     /** Блокирующий вызов из загрузчика плеера: прямая ссылка на поток (временная). */
     fun streamUrl(base: String, ta: String?): String = withKey { key ->
         val extra = if (ta.isNullOrBlank()) "" else "&track_authorization=${enc(ta)}"
-        JSONObject(httpGet("$base?client_id=$key$extra", BROWSER_UA)).getString("url")
+        JSONObject(get("$base?client_id=$key$extra")).getString("url")
     }
 }
 
