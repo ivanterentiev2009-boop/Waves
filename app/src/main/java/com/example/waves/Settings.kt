@@ -242,6 +242,14 @@ private fun LookPage(onBack: () -> Unit) {
 @Composable
 private fun WavePage(onBack: () -> Unit) {
     Page("Моя волна", onBack) {
+        Group("Откуда брать музыку") {
+            Hint("Можно включить несколько источников сразу: треки из них будут чередоваться. Волны по артисту и по песне всегда из Яндекса.")
+            SwitchRow("Яндекс Музыка", Style.waveYandex, "Рекомендации «Моей волны» (нужен вход)") { Style.waveYandex = it; Style.save() }
+            SwitchRow("SoundCloud", Style.waveSc, "Похожие на играющий трек или популярное") { Style.waveSc = it; Style.save() }
+            SwitchRow("Файлы на телефоне", Style.waveLocal, "Случайные треки из твоей памяти") { Style.waveLocal = it; Style.save() }
+            SwitchRow("Свой сервер", Style.waveSub, "Случайные треки с Navidrome и похожих") { Style.waveSub = it; Style.save() }
+            SwitchRow("Мне нравится из Яндекса", Style.waveLikes, "Случайные из понравившихся (нужен вход)") { Style.waveLikes = it; Style.save() }
+        }
         Hint("Вид меняется сразу на главной вкладке «Волна». Нужен вход в Яндекс Музыку.")
         Group {
             WAVE_STYLES.forEachIndexed { i, (name, desc) ->

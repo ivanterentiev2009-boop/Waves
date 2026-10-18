@@ -72,6 +72,8 @@ object Recent {
             val a = JSONArray(s.getString("list", "[]"))
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
+                val id = o.getString("id")
+                if (id.startsWith("radio") || id.startsWith("au")) continue   // удалённые источники: радио и Audius
                 list.add(Track(o.getString("id"), o.getString("t"), o.getString("a"), Uri.parse(o.getString("u")),
                     o.optString("c").takeIf { it.isNotBlank() }?.let { Uri.parse(it) }))
             }
@@ -181,7 +183,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
             loading = true; err = null
             try {
                 val station = resolve()
-                val l = withContext(Dispatchers.IO) { YandexApi.wave(null, station) }
+                val l = WaveMix.start(ctx, station, np.id?.takeIf { it.startsWith("sc") } ?: seedId)
                 if (l.isEmpty()) err = "Волна пока пуста" else { Wave.station = station; YState.wave = l; startPlay(l, 0); Wave.active = true }
             } catch (e: Exception) { err = "Ошибка: ${e.message}" }
             loading = false
@@ -218,6 +220,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 })
         }
+        item { WaveSourceChips(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         err?.let { item { Text(it, Modifier.padding(20.dp, 4.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) } }
         item { RecentCard(onRecent) }
         if (Recent.list.isNotEmpty()) {

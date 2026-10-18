@@ -66,6 +66,7 @@ object YState {
 /** Подгружает следующие треки волны, когда в очереди остаётся три и меньше. */
 @Composable
 fun WaveFeeder(c: MediaController?, np: NowPlaying) {
+    val ctx = LocalContext.current
     var busy by remember { mutableStateOf(false) }
     var lastId by remember { mutableStateOf<String?>(null) }
     var lastStart by remember { mutableLongStateOf(0L) }
@@ -88,9 +89,11 @@ fun WaveFeeder(c: MediaController?, np: NowPlaying) {
         if (ctl.mediaItemCount - ctl.currentMediaItemIndex <= 3) {
             busy = true
             try {
-                val last = ctl.getMediaItemAt(ctl.mediaItemCount - 1).mediaId.removePrefix("ym")
-                val more = withContext(Dispatchers.IO) { YandexApi.wave(last, Wave.station) }
-                val have = (0 until ctl.mediaItemCount).map { ctl.getMediaItemAt(it).mediaId }.toSet()
+                val ids = (0 until ctl.mediaItemCount).map { ctl.getMediaItemAt(it).mediaId }
+                val last = ids.lastOrNull { it.startsWith("ym") }?.removePrefix("ym")   // продолжение волны Яндекса
+                val seed = ids.getOrNull(ctl.currentMediaItemIndex)
+                val more = WaveMix.more(ctx, Wave.station, last, seed, ids.toSet())
+                val have = ids.toSet()
                 val fresh = more.filter { it.id !in have }
                 if (fresh.isNotEmpty()) { ctl.addMediaItems(fresh.map { it.toMediaItem() }); YState.wave = YState.wave + fresh }
             } catch (_: Exception) { }

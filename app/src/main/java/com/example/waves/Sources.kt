@@ -189,6 +189,12 @@ object SoundCloud {
             if (policy == "SNIP") 30_000L else o.optLong("duration"))
     }
 
+    /** Блокирующий вызов: треки, похожие на данный (trackNumId без префикса «sc»). */
+    fun related(trackNumId: String): List<Track> = withKey { key ->
+        val a = JSONObject(get("https://api-v2.soundcloud.com/tracks/$trackNumId/related?limit=30&client_id=$key")).optJSONArray("collection") ?: JSONArray()
+        (0 until a.length()).mapNotNull { parse(a.getJSONObject(it)) }.distinctBy { it.id }
+    }
+
     /** Блокирующий вызов: подсказки к началу запроса. */
     fun suggest(q: String): List<String> = withKey { key ->
         val a = JSONObject(get("https://api-v2.soundcloud.com/search/queries?q=${enc(q)}&limit=8&client_id=$key")).optJSONArray("collection") ?: JSONArray()

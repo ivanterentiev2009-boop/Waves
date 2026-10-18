@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NorthWest
@@ -204,4 +205,36 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                 }
             }
         }
+}
+
+/**
+ * Источники «Моей волны»: нажатием включаются и выключаются, можно несколько сразу. Хотя бы один всегда включён.
+ * Изменения применяются к следующей подборке («Стряхнуть волну» делает это сразу).
+ */
+@Composable
+fun WaveSourceChips(modifier: Modifier = Modifier) {
+    val chips = listOf("Яндекс" to Style.waveYandex, "SoundCloud" to Style.waveSc, "Файлы" to Style.waveLocal,
+        "Сервер" to Style.waveSub, "Нравится" to Style.waveLikes)
+    fun toggle(i: Int) {
+        val on = listOf(Style.waveYandex, Style.waveSc, Style.waveLocal, Style.waveSub, Style.waveLikes).toMutableList()
+        on[i] = !on[i]
+        if (on.none { it }) return
+        Style.waveYandex = on[0]; Style.waveSc = on[1]; Style.waveLocal = on[2]; Style.waveSub = on[3]; Style.waveLikes = on[4]
+        Style.save()
+    }
+    Column(modifier) {
+        Text("Откуда музыка в волне", color = Color.White.copy(0.7f), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            chips.forEachIndexed { i, (label, on) ->
+                val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "wsb")
+                val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "wsf")
+                val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(0.18f), tween(250), label = "wsl")
+                Row(Modifier.clip(CircleShape).background(bg).border(1.dp, line, CircleShape).clickable { toggle(i) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (on) { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = fg); Spacer(Modifier.width(6.dp)) }
+                    Text(label, color = fg, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                }
+            }
+        }
+    }
 }
