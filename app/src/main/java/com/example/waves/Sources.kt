@@ -47,65 +47,6 @@ private fun httpGet(url: String, ua: String = "Waves/0.18"): String {
     return body
 }
 
-/** Интернет-радио: открытая база radio-browser.info, ключ не нужен. */
-object Radio {
-    private val hosts = listOf("https://de1.api.radio-browser.info", "https://nl1.api.radio-browser.info", "https://at1.api.radio-browser.info")
-
-    fun search(q: String): List<Track> {
-        val path = if (q.isBlank()) "/json/stations/search?language=russian&limit=60&hidebroken=true&order=clickcount&reverse=true"
-        else "/json/stations/search?name=${enc(q)}&limit=60&hidebroken=true&order=clickcount&reverse=true"
-        var last: Exception? = null
-        for (h in hosts) try { return parse(httpGet(h + path)) } catch (e: Exception) { last = e }
-        throw last ?: IOException("нет ответа")
-    }
-
-    private fun parse(body: String): List<Track> {
-        val a = JSONArray(body)
-        return (0 until a.length()).mapNotNull { i ->
-            val o = a.getJSONObject(i)
-            val url = o.optString("url_resolved").ifBlank { o.optString("url") }
-            if (url.isBlank() || o.optInt("hls") == 1) return@mapNotNull null
-            val name = o.optString("name").trim().ifBlank { return@mapNotNull null }
-            val tags = o.optString("tags").split(",").map { it.trim() }.filter { it.isNotBlank() }.take(2).joinToString(", ")
-            val sub = listOf(o.optString("country"), tags).filter { it.isNotBlank() }.joinToString(", ")
-            Track("radio" + o.optString("stationuuid"), name, sub.ifBlank { "Радио" }, Uri.parse(url),
-                o.optString("favicon").takeIf { it.startsWith("http") }?.let { Uri.parse(it) })
-        }.distinctBy { it.id }
-    }
-}
-
-/** Audius: открытая платформа независимых музыкантов, ключ не нужен. */
-object Audius {
-    private var host: String? = null
-
-    private fun host(): String {
-        host?.let { return it }
-        val h = try { JSONObject(httpGet("https://api.audius.co")).getJSONArray("data").getString(0) }
-        catch (_: Exception) { "https://discoveryprovider.audius.co" }
-        host = h
-        return h
-    }
-
-    fun search(q: String): List<Track> {
-        val path = if (q.isBlank()) "/v1/tracks/trending?limit=40&app_name=Waves" else "/v1/tracks/search?query=${enc(q)}&app_name=Waves"
-        return try { parse(httpGet(host() + path)) } catch (_: Exception) { host = null; parse(httpGet(host() + path)) }
-    }
-
-    private fun parse(body: String): List<Track> {
-        val a = JSONObject(body).getJSONArray("data")
-        val h = host()
-        return (0 until a.length()).mapNotNull { i ->
-            val o = a.getJSONObject(i)
-            val id = o.optString("id")
-            if (id.isBlank() || !o.optBoolean("is_streamable", true)) return@mapNotNull null
-            Track("au$id", o.optString("title").ifBlank { "Без названия" },
-                o.optJSONObject("user")?.optString("name").orEmpty().ifBlank { "Audius" },
-                Uri.parse("$h/v1/tracks/$id/stream?app_name=Waves"),
-                o.optJSONObject("artwork")?.optString("480x480")?.takeIf { it.startsWith("http") }?.let { Uri.parse(it) })
-        }.distinctBy { it.id }
-    }
-}
-
 /**
  * SoundCloud: публичные треки, без входа. Использует тот же ключ, что и сайт soundcloud.com, поэтому
  * неофициально: если сайт поменяется, ключ придётся получить заново (приложение делает это само).
@@ -249,7 +190,7 @@ object SrcState {
     fun reset(key: String) { panes.remove(key) }
 }
 
-private val SOURCE_NAMES = listOf("Яндекс", "Радио", "Audius", "SoundCloud", "Сервер", "Ссылка")
+private val SOURCE_NAMES = listOf("Яндекс", "SoundCloud", "Сервер", "Ссылка")
 
 /** Вкладка «Поиск»: переключатель источников музыки. */
 @Composable
@@ -264,14 +205,12 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
                 LaunchedEffect(Unit) { YState.section = 1 }
                 YandexTab(c, np, startPlay, Modifier.weight(1f), showTabs = false)
             }
-            1 -> TrackPane("radio", "Название радиостанции", np, startPlay, Modifier.weight(1f)) { Radio.search(it) }
-            2 -> TrackPane("audius", "Трек или исполнитель на Audius", np, startPlay, Modifier.weight(1f)) { Audius.search(it) }
-            3 -> {
+            1 -> {
                 Text("Платные треки Go+ играют только 30-секундное превью.", Modifier.padding(horizontal = 20.dp),
                     color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
                 TrackPane("sc", "Трек или исполнитель на SoundCloud", np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
             }
-            4 -> if (Subsonic.configured) {
+            2 -> if (Subsonic.configured) {
                 Row(Modifier.padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(Subsonic.url.substringAfter("://"), Modifier.weight(1f), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                     TextButton({ Subsonic.logout(); SrcState.reset("sub") }) { Text("Отключить") }
