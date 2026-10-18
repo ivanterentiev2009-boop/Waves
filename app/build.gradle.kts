@@ -21,6 +21,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.lifecycle:lifecycle-service:2.8.6")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")   // потоки SoundCloud, у которых нет обычной версии
     implementation("androidx.media3:media3-session:1.4.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("dev.chrisbanes.haze:haze:1.2.0")   // размытие того, что под панелью

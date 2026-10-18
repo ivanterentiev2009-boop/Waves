@@ -47,7 +47,7 @@ object Style {
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
-    const val BUILD = "r20"
+    const val BUILD = "r21"
     var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
     var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var ovScale by mutableFloatStateOf(1f)     // редактор оверлея

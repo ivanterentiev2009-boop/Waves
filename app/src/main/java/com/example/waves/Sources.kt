@@ -61,6 +61,8 @@ object SoundCloud {
     var how by mutableStateOf("")
         private set
     val hasKey: Boolean get() = cid.isNotBlank()
+    /** Итог последнего запроса: сколько найдено и сколько можно играть. */
+    var info by mutableStateOf("")
 
     fun init(ctx: Context) {
         if (sp != null) return
@@ -127,17 +129,20 @@ object SoundCloud {
 
     fun search(q: String): List<Track> = withKey { key ->
         val body = if (q.isBlank()) {
-            try { get("https://api-v2.soundcloud.com/charts?kind=top&genre=soundcloud%3Agenres%3Aall-music&limit=40&client_id=$key") }
+            try { get("https://api-v2.soundcloud.com/charts?kind=trending&genre=soundcloud%3Agenres%3Aall-music&limit=50&client_id=$key") }
             catch (e: Exception) {
                 if (isAuthError(e)) throw e
                 get("https://api-v2.soundcloud.com/search/tracks?q=${enc("music")}&limit=40&client_id=$key")   // чарты недоступны: берём обычный поиск
             }
         } else get("https://api-v2.soundcloud.com/search/tracks?q=${enc(q)}&limit=40&client_id=$key")
         val a = JSONObject(body).optJSONArray("collection") ?: JSONArray()
-        (0 until a.length()).mapNotNull { i ->
+        val out = (0 until a.length()).mapNotNull { i ->
             val o = a.getJSONObject(i)
             parse(o.optJSONObject("track") ?: o)
         }.distinctBy { it.id }
+        info = if (a.length() > out.size) "Найдено ${a.length()}, можно играть ${out.size}: остальные закрыты правообладателем"
+        else ""
+        out
     }
 
     private fun parse(o: JSONObject): Track? {
@@ -145,14 +150,22 @@ object SoundCloud {
         val policy = o.optString("policy")
         if (id == 0L || policy == "BLOCK" || !o.optBoolean("streamable", true)) return null
         val tr = o.optJSONObject("media")?.optJSONArray("transcodings") ?: return null
+        // сначала обычный поток; если его нет, берём HLS в mp3 или aac (opus плеер не потянет)
         var url: String? = null
+        var hls = false
         for (i in 0 until tr.length()) {
             val t = tr.getJSONObject(i)
             if (t.optJSONObject("format")?.optString("protocol") == "progressive") { url = t.optString("url"); break }
         }
+        if (url == null) for (i in 0 until tr.length()) {
+            val t = tr.getJSONObject(i)
+            val f = t.optJSONObject("format") ?: continue
+            val mime = f.optString("mime_type")
+            if (f.optString("protocol") == "hls" && ("mpeg" in mime || "mp4a" in mime)) { url = t.optString("url"); hls = true; break }
+        }
         val u = Uri.parse(url ?: return null)
         val ta = o.optString("track_authorization")
-        val uri = Uri.Builder().scheme("scloud").authority(u.host).path(u.path).apply {
+        val uri = Uri.Builder().scheme("scloud").authority(u.host).path(u.path + if (hls) ".m3u8" else "").apply {
             if (ta.isNotBlank()) appendQueryParameter("ta", ta)
         }.build()
         val title = o.optString("title").ifBlank { "Без названия" } + if (policy == "SNIP") " (превью)" else ""
@@ -255,6 +268,8 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
             }
             1 -> {
                 Text("Платные треки Go+ играют только 30-секундное превью.", Modifier.padding(horizontal = 20.dp),
+                    color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                if (SoundCloud.info.isNotBlank()) Text(SoundCloud.info, Modifier.padding(horizontal = 20.dp),
                     color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
                 TrackPane("sc", "Трек или исполнитель на SoundCloud", np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
             }

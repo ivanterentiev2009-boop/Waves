@@ -29,7 +29,7 @@ class PlaybackService : MediaSessionService() {
         val resolving = ResolvingDataSource.Factory(http) { spec ->
             when (spec.uri.scheme) {
                 "ymusic" -> spec.withUri(Uri.parse(YandexApi.streamUrl(spec.uri.toString().removePrefix("ymusic://"))))
-                "scloud" -> spec.withUri(Uri.parse(SoundCloud.streamUrl("https://" + spec.uri.host + spec.uri.path, spec.uri.getQueryParameter("ta"))))
+                "scloud" -> spec.withUri(Uri.parse(SoundCloud.streamUrl("https://" + spec.uri.host + spec.uri.path.orEmpty().removeSuffix(".m3u8"), spec.uri.getQueryParameter("ta"))))
                 else -> spec
             }
         }
