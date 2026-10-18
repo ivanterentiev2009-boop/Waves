@@ -148,7 +148,8 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
     }
     val shape = RoundedCornerShape(32.dp)
     val noRipple = remember { MutableInteractionSource() }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // decorFitsSystemWindows = false: окно получает размер клавиатуры сам, и imePadding поднимает панель над ней
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().clickable(interactionSource = noRipple, indication = null, onClick = onDismiss)) {
             Column(Modifier.align(Alignment.BottomCenter).imePadding().navigationBarsPadding().padding(12.dp).fillMaxWidth()
                 .clip(shape).background(Color(0xF01E1E24)).border(1.dp, Color.White.copy(0.10f), shape)
