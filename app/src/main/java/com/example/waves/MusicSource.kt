@@ -7,7 +7,7 @@ import android.provider.MediaStore
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 
-data class Track(val id: String, val title: String, val artist: String, val uri: Uri, val art: Uri?)
+data class Track(val id: String, val title: String, val artist: String, val uri: Uri, val art: Uri?, val durationMs: Long = 0L)
 
 fun Track.toMediaItem() = MediaItem.Builder()
     .setMediaId(id).setUri(uri)

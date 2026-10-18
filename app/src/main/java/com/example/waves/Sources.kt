@@ -11,6 +11,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -181,7 +185,14 @@ object SoundCloud {
         val user = o.optJSONObject("user")
         val art = (o.optString("artwork_url").ifBlank { user?.optString("avatar_url").orEmpty() })
             .takeIf { it.startsWith("http") }?.replace("-large", "-t500x500")
-        return Track("sc$id", title, user?.optString("username").orEmpty().ifBlank { "SoundCloud" }, uri, art?.let { Uri.parse(it) })
+        return Track("sc$id", title, user?.optString("username").orEmpty().ifBlank { "SoundCloud" }, uri, art?.let { Uri.parse(it) },
+            if (policy == "SNIP") 30_000L else o.optLong("duration"))
+    }
+
+    /** Блокирующий вызов: подсказки к началу запроса. */
+    fun suggest(q: String): List<String> = withKey { key ->
+        val a = JSONObject(get("https://api-v2.soundcloud.com/search/queries?q=${enc(q)}&limit=8&client_id=$key")).optJSONArray("collection") ?: JSONArray()
+        (0 until a.length()).map { a.getJSONObject(it).optString("output") }.filter { it.isNotBlank() }
     }
 
     /** Блокирующий вызов: номер автора трека (trackNumId: число без префикса «sc»). */
@@ -261,7 +272,8 @@ object Subsonic {
             val cover = o.optString("coverArt").takeIf { it.isNotBlank() }
             Track("sub$id", o.optString("title").ifBlank { "Без названия" }, o.optString("artist").ifBlank { "Неизвестный исполнитель" },
                 Uri.parse("$url/rest/stream.view?id=${enc(id)}&${auth(user, pass)}"),
-                cover?.let { Uri.parse("$url/rest/getCoverArt.view?id=${enc(it)}&size=400&${auth(user, pass)}") })
+                cover?.let { Uri.parse("$url/rest/getCoverArt.view?id=${enc(it)}&size=400&${auth(user, pass)}") },
+                o.optLong("duration") * 1000)
         }.distinctBy { it.id }
     }
 }
@@ -345,7 +357,8 @@ object SrcState {
     fun reset(key: String) { panes.remove(key) }
 }
 
-private val SOURCE_NAMES = listOf("Яндекс", "SoundCloud", "Сервер", "Ссылка")
+private val SOURCE_CHIPS = listOf(Icons.Default.LibraryMusic to "Яндекс", Icons.Default.Cloud to "SoundCloud",
+    Icons.Default.Dns to "Сервер", Icons.Default.Link to "Ссылка")
 
 /** Вкладка «Поиск»: переключатель источников музыки. */
 @Composable
@@ -353,8 +366,7 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
     val ctx = LocalContext.current
     remember { Subsonic.init(ctx); SoundCloud.init(ctx) }
     Column(modifier) {
-        Pill(SOURCE_NAMES, SrcState.src, { SrcState.src = it },
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp).horizontalScroll(rememberScrollState()))
+        ChipRow(SOURCE_CHIPS, SrcState.src, { SrcState.src = it }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         when (SrcState.src) {
             0 -> {
                 LaunchedEffect(Unit) { YState.section = 1 }
@@ -365,14 +377,14 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
                     color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
                 if (SoundCloud.info.isNotBlank()) Text(SoundCloud.info, Modifier.padding(horizontal = 20.dp),
                     color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
-                TrackPane("sc", "Трек или исполнитель на SoundCloud", np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
+                TrackPane("sc", "Трек или исполнитель на SoundCloud", "SC", { SoundCloud.suggest(it) }, np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
             }
             2 -> if (Subsonic.configured) {
                 Row(Modifier.padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(Subsonic.url.substringAfter("://"), Modifier.weight(1f), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                     TextButton({ Subsonic.logout(); SrcState.reset("sub") }) { Text("Отключить") }
                 }
-                TrackPane("sub", "Трек или исполнитель на сервере", np, startPlay, Modifier.weight(1f)) { Subsonic.tracks(it) }
+                TrackPane("sub", "Трек или исполнитель на сервере", "S", null, np, startPlay, Modifier.weight(1f)) { Subsonic.tracks(it) }
             } else SubsonicSetup(Modifier.weight(1f))
             else -> LinkPane(startPlay, Modifier.weight(1f))
         }
@@ -380,8 +392,8 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
 }
 
 @Composable
-private fun TrackPane(key: String, hint: String, np: NowPlaying, startPlay: (List<Track>, Int) -> Unit,
-                      modifier: Modifier, search: (String) -> List<Track>) {
+private fun TrackPane(key: String, hint: String, badge: String, suggest: ((String) -> List<String>)?, np: NowPlaying,
+                      startPlay: (List<Track>, Int) -> Unit, modifier: Modifier, search: (String) -> List<Track>) {
     val st = SrcState.pane(key)
     var loading by remember { mutableStateOf(false) }
     LaunchedEffect(st.query) {
@@ -398,7 +410,7 @@ private fun TrackPane(key: String, hint: String, np: NowPlaying, startPlay: (Lis
         loading = false
     }
     Column(modifier) {
-        SearchField(st.query, { st.query = it }, hint, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        SearchBox(st.query, { st.query = it }, hint, badge, suggest, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp))
         st.status?.let { Text(it, Modifier.padding(16.dp, 8.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
         LazyColumn(Modifier.weight(1f)) {

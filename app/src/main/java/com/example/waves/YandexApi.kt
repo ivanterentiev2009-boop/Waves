@@ -62,7 +62,7 @@ object YandexApi {
         val names = (0 until (artists?.length() ?: 0)).joinToString(", ") { artists!!.getJSONObject(it).optString("name") }
         val cover = o.optString("coverUri").takeIf { it.isNotBlank() }?.let { Uri.parse("https://" + it.replace("%%", "400x400")) }
         return Track("ym$id", o.optString("title", "Без названия"), names.ifBlank { "Неизвестный исполнитель" },
-            Uri.parse("ymusic://$id"), cover)
+            Uri.parse("ymusic://$id"), cover, o.optLong("durationMs"))
     }
 
     private fun details(ids: List<String>): List<Track> = ids.chunked(100).flatMap { chunk ->
@@ -94,6 +94,12 @@ object YandexApi {
         val genres = (0 until (gs?.length() ?: 0)).joinToString(", ") { gs!!.optString(it) }
         val cover = coverUri(o.optJSONObject("cover")?.optString("uri")) ?: coverUri(o.optString("ogImage"))
         return ArtistItem(o.get("id").toString(), o.optString("name"), cover, sub, genres)
+    }
+
+    /** Подсказки к началу запроса. */
+    fun suggest(part: String): List<String> {
+        val r = json("$BASE/search/suggest?part=${URLEncoder.encode(part, "UTF-8")}").getJSONObject("result").optJSONArray("suggestions") ?: return emptyList()
+        return (0 until r.length()).map { r.getString(it) }.filter { it.isNotBlank() }
     }
 
     fun searchArtists(q: String): List<ArtistItem> {

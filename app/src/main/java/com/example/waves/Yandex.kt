@@ -7,6 +7,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -46,6 +49,7 @@ object Wave {
 /** Состояние раздела Яндекса живёт здесь, чтобы не сбрасываться при переключении вкладок. */
 object YState {
     var section by mutableIntStateOf(0)          // 0 волна, 1 поиск, 2 мне нравится
+    var filter by mutableIntStateOf(0)           // что показывать в поиске: 0 всё, 1 треки, 2 исполнители
     var wave by mutableStateOf<List<Track>>(emptyList())
     var likes by mutableStateOf<List<Track>>(emptyList())
     var results by mutableStateOf<List<Track>>(emptyList())
@@ -202,20 +206,27 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                     }
                 }
                 1 -> {
-                    SearchField(YState.query, { YState.query = it }, "Трек или исполнитель",
+                    SearchBox(YState.query, { YState.query = it }, "Трек или исполнитель", "Я", { YandexApi.suggest(it) },
                         Modifier.padding(horizontal = 16.dp, vertical = 6.dp), onSearch = { search(true) })
+                    ChipRow(listOf(Icons.Default.GridView to "Всё", Icons.Default.MusicNote to "Треки", Icons.Default.Person to "Исполнители"),
+                        YState.filter, { YState.filter = it }, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                     LazyColumn(Modifier.weight(1f)) {
-                        if (YState.artists.isNotEmpty()) {
-                            item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
-                            item {
-                                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(YState.artists, key = { it.id }) { a -> ArtistChip(a) { openArtist(a.id) } }
+                        val f = YState.filter
+                        if (f != 1 && YState.artists.isNotEmpty()) {
+                            if (f == 0) {
+                                item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                                item {
+                                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        items(YState.artists, key = { it.id }) { a -> ArtistChip(a) { openArtist(a.id) } }
+                                    }
                                 }
-                            }
-                            if (YState.results.isNotEmpty()) item { Text("Треки", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                                if (YState.results.isNotEmpty()) item { Text("Треки", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            } else items(YState.artists, key = { it.id }) { a -> ArtistRow(a) { openArtist(a.id) } }
                         }
-                        itemsIndexed(YState.results, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == cur) { onPlay(YState.results, i) } }
-                        if (YState.more) item { TextButton({ search(false) }, Modifier.fillMaxWidth()) { Text("Показать ещё") } }
+                        if (f != 2) {
+                            itemsIndexed(YState.results, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == cur) { onPlay(YState.results, i) } }
+                            if (YState.more) item { TextButton({ search(false) }, Modifier.fillMaxWidth()) { Text("Показать ещё") } }
+                        }
                         item { Spacer(Modifier.height(16.dp)) }
                     }
                 }

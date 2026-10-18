@@ -131,3 +131,16 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
         }
     }
 }
+
+/** Исполнитель в списке результатов: аватар, имя, подпись. */
+@Composable
+fun ArtistRow(a: ArtistItem, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape((Style.corner * 0.7f).dp))
+        .clickable(onClick = onClick).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Avatar(a.cover, 64); Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.name, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (a.sub.isNotBlank()) Text(a.sub, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}

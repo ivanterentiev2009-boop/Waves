@@ -275,16 +275,23 @@ fun WaveCard(t: Track, onClick: () -> Unit) {
     }
 }
 
+/** 1:46 из миллисекунд. */
+fun fmtDuration(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
+
 @Composable
 fun TrackRow(t: Track, sel: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape((Style.corner * 0.7f).dp))
         .background(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent)
-        .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Cover(t.art, 50); Spacer(Modifier.width(14.dp))
+        .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Cover(t.art, 64); Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(t.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(t.artist, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(t.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(t.artist, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (sel) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
+        if (sel) Icon(Icons.Default.GraphicEq, null, Modifier.padding(start = 8.dp), tint = Color(Style.accent))
+        if (t.durationMs > 0) Box(Modifier.padding(start = 10.dp).clip(CircleShape).background(Color.White.copy(0.06f))
+            .border(1.dp, Color.White.copy(0.14f), CircleShape).padding(horizontal = 12.dp, vertical = 7.dp)) {
+            Text(fmtDuration(t.durationMs), color = Color(0xCCFFFFFF), fontSize = 14.sp)
+        }
     }
 }
