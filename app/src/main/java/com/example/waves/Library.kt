@@ -39,6 +39,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.launch
 
 /** Общие вещи приложения: контекст и фоновая область, которая не отменяется при закрытии экранов. */
 object AppData {

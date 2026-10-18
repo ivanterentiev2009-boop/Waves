@@ -60,6 +60,7 @@ import org.json.JSONObject
 import kotlin.math.PI
 import kotlin.math.sin
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.text.style.TextOverflow
 
 /** Недавно играли: хранится на телефоне, последние 30 треков. */
 object Recent {
