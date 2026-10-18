@@ -54,13 +54,39 @@ private fun httpGet(url: String, ua: String = "Waves/0.18"): String {
  */
 object SoundCloud {
     private var sp: SharedPreferences? = null
-    private var cid = ""
+    var cid by mutableStateOf("")
+        private set
+    /** Как получен ключ: «автоматически», «через сайт» или «вручную». */
+    var how by mutableStateOf("")
+        private set
+    val hasKey: Boolean get() = cid.isNotBlank()
 
     fun init(ctx: Context) {
         if (sp != null) return
         val s = ctx.applicationContext.getSharedPreferences("soundcloud", 0); sp = s
         cid = s.getString("cid", "").orEmpty()
+        how = s.getString("how", "").orEmpty()
     }
+
+    fun setKey(key: String, source: String) {
+        cid = key; how = source
+        sp?.edit()?.putString("cid", key)?.putString("how", source)?.apply()
+    }
+
+    fun reset() { cid = ""; how = ""; sp?.edit()?.clear()?.apply() }
+
+    /** Ключ из адреса запроса вида ...?client_id=XXXX... */
+    fun fromUrl(text: String): String? = Regex("client_id=([A-Za-z0-9]{32})").find(text)?.groupValues?.get(1)
+
+    /** Принимает сам ключ (32 символа) или любую ссылку со строкой client_id=. */
+    fun parseKey(text: String): String? =
+        fromUrl(text) ?: text.trim().takeIf { Regex("[A-Za-z0-9]{32}").matches(it) }
+
+    /** Блокирующий вызов: найти ключ на сайте. */
+    fun refreshAuto(): String = fetchClientId()
+
+    /** Блокирующий вызов: проверить, что ключ работает. Бросает исключение, если нет. */
+    fun check() { httpGet("https://api-v2.soundcloud.com/search/tracks?q=a&limit=1&client_id=$cid", BROWSER_UA) }
 
     private fun fetchClientId(): String {
         val html = httpGet("https://soundcloud.com", BROWSER_UA)
@@ -68,8 +94,7 @@ object SoundCloud {
         for (u in scripts) {
             val m = Regex("client_id\\s*[:=]\\s*\"([A-Za-z0-9]{32})\"").find(httpGet(u, BROWSER_UA))
             if (m != null) {
-                cid = m.groupValues[1]
-                sp?.edit()?.putString("cid", cid)?.apply()
+                setKey(m.groupValues[1], "автоматически")
                 return cid
             }
         }

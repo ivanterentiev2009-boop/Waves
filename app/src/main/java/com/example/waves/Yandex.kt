@@ -239,7 +239,7 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
 }
 
 @Composable
-private fun LoginDialog(onToken: (String) -> Unit, onClose: () -> Unit) {
+fun LoginDialog(onToken: (String) -> Unit, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), factory = { ctx ->

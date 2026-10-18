@@ -12,7 +12,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PictureInPicture
@@ -30,6 +32,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val dimText = Color(0xB3FFFFFF)
 private val faintText = Color(0x80FFFFFF)
@@ -155,6 +168,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 1 -> WavePage { page = -1 }
                 2 -> OverlayPage { page = -1 }
                 3 -> LyricsPage { page = -1 }
+                5 -> ServicesPage { page = -1 }
                 4 -> RecognitionPage { page = -1 }
                 else -> Hub(onBack) { page = it }
             }
@@ -165,6 +179,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 @Composable
 private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    remember { SoundCloud.init(ctx) }
     val lyricSources = listOf(Style.lyYandex, Style.lyLrclib, Style.lyOvh).count { it }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -176,6 +191,9 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
             NavRow(Icons.Default.GraphicEq, "Моя волна", WAVE_STYLES[Style.waveStyle.coerceIn(0, WAVE_STYLES.lastIndex)].first) { open(1) }
             NavRow(Icons.Default.PictureInPicture, "Оверлей",
                 "Размер ${(Style.ovScale * 100).toInt()}%, старт: " + listOf("пузырёк", "компактный", "полный")[Style.ovStart.coerceIn(0, 2)]) { open(2) }
+            NavRow(Icons.Default.LibraryMusic, "Музыкальные сервисы",
+                "Яндекс: " + (if (YandexApi.token.isNotBlank()) "вход выполнен" else "не выполнен") +
+                    ", SoundCloud: " + (if (SoundCloud.hasKey) "ключ есть" else "нет ключа")) { open(5) }
             NavRow(Icons.Default.Subtitles, "Тексты песен", "Включено источников: $lyricSources из 3") { open(3) }
             NavRow(Icons.Default.Mic, "Распознавание текста",
                 if (!Style.subsEnabled) "Выключено" else if (Style.asrEngine == 1) "GigaAM" else "Vosk") { open(4) }
@@ -332,6 +350,98 @@ private fun RecognitionPage(onBack: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SoundCloudWebDialog(onKey: (String) -> Unit, onClose: () -> Unit) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.userAgentString = settings.userAgentString.replace("; wv", "")
+                    webViewClient = object : WebViewClient() {
+                        private var done = false
+                        // сайт сам шлёт запросы с ключом: ловим первый такой запрос
+                        override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? {
+                            val k = SoundCloud.fromUrl(r.url.toString())
+                            if (!done && k != null) { done = true; v.post { onKey(k) } }
+                            return null
+                        }
+                    }
+                    loadUrl("https://soundcloud.com")
+                }
+            })
+            Text("Подожди, пока страница загрузится: ключ поймается сам", Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 16.dp, top = 12.dp, end = 64.dp),
+                color = Color.White, style = MaterialTheme.typography.bodySmall)
+            IconButton(onClose, Modifier.align(Alignment.TopEnd).statusBarsPadding()) {
+                Icon(Icons.Default.Close, null, tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServicesPage(onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    remember { SoundCloud.init(ctx) }
+    val scope = rememberCoroutineScope()
+    var yLogin by remember { mutableStateOf(false) }
+    var scWeb by remember { mutableStateOf(false) }
+    var manual by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var msg by remember { mutableStateOf<String?>(null) }
+    var ok by remember { mutableStateOf(true) }
+    val green = Color(0xFF6EE7B7)
+    if (yLogin) LoginDialog(onToken = { url -> YandexApi.saveToken(url); yLogin = false }, onClose = { yLogin = false })
+    if (scWeb) SoundCloudWebDialog(
+        onKey = { k -> SoundCloud.setKey(k, "через сайт"); scWeb = false; msg = "Ключ получен с сайта"; ok = true },
+        onClose = { scWeb = false })
+    Page("Музыкальные сервисы", onBack) {
+        Group("Яндекс Музыка") {
+            val logged = YandexApi.token.isNotBlank()
+            Text(if (logged) "Вход выполнен" else "Вход не выполнен", color = if (logged) green else dimText)
+            Hint("Вход открывается во встроенном окне Яндекса. Приложение не видит пароль: оно получает только токен и хранит его на телефоне.")
+            Button({ yLogin = true }) { Text(if (logged) "Войти заново" else "Войти через Яндекс") }
+            if (logged) TextButton({
+                YandexApi.logout(); YState.likes = emptyList(); YState.results = emptyList(); YState.wave = emptyList(); Wave.active = false
+            }) { Text("Выйти") }
+        }
+        Group("SoundCloud") {
+            Text(if (SoundCloud.hasKey) "Ключ есть" + (if (SoundCloud.how.isNotBlank()) " (${SoundCloud.how})" else "") else "Ключа пока нет",
+                color = if (SoundCloud.hasKey) green else dimText)
+            Hint("Ключ нужен для поиска и воспроизведения. Вход в аккаунт не требуется. Выбери любой способ, начни с первого.")
+            Text("Способ 1. Автоматически", color = Color.White, fontWeight = FontWeight.Medium)
+            Hint("Приложение само найдёт ключ на сайте SoundCloud.")
+            Button({
+                scope.launch {
+                    busy = true; msg = null
+                    try {
+                        withContext(Dispatchers.IO) { SoundCloud.refreshAuto(); SoundCloud.check() }
+                        msg = "Готово: ключ получен и проверен"; ok = true
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { msg = "Не вышло: ${e.message}"; ok = false }
+                    busy = false
+                }
+            }, enabled = !busy) { Text(if (busy) "Ищу…" else "Получить автоматически") }
+            HorizontalDivider(color = Color.White.copy(0.10f))
+            Text("Способ 2. Через сайт", color = Color.White, fontWeight = FontWeight.Medium)
+            Hint("Откроется soundcloud.com. Дождись загрузки страницы, ключ поймается сам, нажимать ничего не нужно.")
+            Button({ scWeb = true }) { Text("Открыть soundcloud.com") }
+            HorizontalDivider(color = Color.White.copy(0.10f))
+            Text("Способ 3. Вставить вручную", color = Color.White, fontWeight = FontWeight.Medium)
+            Hint("Вставь ключ из 32 символов или любую ссылку из браузера, где есть client_id=.")
+            OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Ключ или ссылка") })
+            Button({
+                val k = SoundCloud.parseKey(manual)
+                if (k == null) { msg = "Не нашёл ключ в этом тексте"; ok = false }
+                else { SoundCloud.setKey(k, "вручную"); msg = "Ключ сохранён"; ok = true; manual = "" }
+            }, enabled = manual.isNotBlank()) { Text("Сохранить ключ") }
+            msg?.let { Text(it, color = if (ok) green else errText, style = MaterialTheme.typography.bodySmall) }
+            if (SoundCloud.hasKey) TextButton({ SoundCloud.reset(); msg = "Ключ удалён"; ok = true }) { Text("Удалить ключ") }
         }
     }
 }
