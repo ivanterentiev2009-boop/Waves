@@ -3,22 +3,31 @@ package com.example.waves
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -175,6 +184,29 @@ object SoundCloud {
         return Track("sc$id", title, user?.optString("username").orEmpty().ifBlank { "SoundCloud" }, uri, art?.let { Uri.parse(it) })
     }
 
+    /** Блокирующий вызов: номер автора трека (trackNumId: число без префикса «sc»). */
+    fun userIdOfTrack(trackNumId: String): Long = withKey { key ->
+        JSONObject(get("https://api-v2.soundcloud.com/tracks/$trackNumId?client_id=$key")).getJSONObject("user").getLong("id")
+    }
+
+    /** Блокирующий вызов: страница автора с его треками. */
+    fun userProfile(userId: Long): SCProfile = withKey { key ->
+        val u = JSONObject(get("https://api-v2.soundcloud.com/users/$userId?client_id=$key"))
+        val coll = JSONObject(get("https://api-v2.soundcloud.com/users/$userId/tracks?limit=50&client_id=$key")).optJSONArray("collection") ?: JSONArray()
+        var tracks = (0 until coll.length()).mapNotNull { parse(coll.getJSONObject(it)) }
+        val ids = (0 until coll.length()).map { coll.getJSONObject(it).optLong("id") }.filter { it != 0L }
+        if (ids.isNotEmpty() && tracks.size < ids.size / 2) {
+            // в списке автора треки пришли неполными: просим их целиком по номерам
+            val arr = JSONArray(get("https://api-v2.soundcloud.com/tracks?ids=${ids.take(40).joinToString(",")}&client_id=$key"))
+            tracks = (0 until arr.length()).mapNotNull { parse(arr.getJSONObject(it)) }
+        }
+        SCProfile(
+            u.optString("username").ifBlank { u.optString("full_name") },
+            u.optString("avatar_url").takeIf { it.startsWith("http") }?.replace("-large", "-t500x500")?.let { Uri.parse(it) },
+            u.optInt("followers_count"), u.optInt("track_count"), u.optString("description").trim(),
+            tracks.distinctBy { it.id })
+    }
+
     /** Блокирующий вызов из загрузчика плеера: прямая ссылка на поток (временная). */
     fun streamUrl(base: String, ta: String?): String = withKey { key ->
         val extra = if (ta.isNullOrBlank()) "" else "&track_authorization=${enc(ta)}"
@@ -234,6 +266,68 @@ object Subsonic {
     }
 }
 
+// ---------- страница автора SoundCloud ----------
+
+data class SCProfile(val name: String, val avatar: Uri?, val followers: Int, val trackCount: Int, val about: String, val tracks: List<Track>)
+
+object SCState {
+    var open by mutableStateOf(false)
+    var profile by mutableStateOf<SCProfile?>(null)
+    var error by mutableStateOf<String?>(null)
+}
+
+/** Открывает страницу автора по номеру трека SoundCloud (без префикса «sc»). */
+fun openSoundCloudArtist(scope: kotlinx.coroutines.CoroutineScope, trackNumId: String) {
+    SCState.open = true; SCState.profile = null; SCState.error = null
+    scope.launch {
+        try {
+            val uid = withContext(Dispatchers.IO) { SoundCloud.userIdOfTrack(trackNumId) }
+            val p = withContext(Dispatchers.IO) { SoundCloud.userProfile(uid) }
+            if (SCState.open) SCState.profile = p
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { SCState.error = "Ошибка: ${e.message}" }
+    }
+}
+
+@Composable
+private fun SoundCloudArtistScreen(np: NowPlaying, startPlay: (List<Track>, Int) -> Unit, modifier: Modifier) {
+    BackHandler { SCState.open = false }
+    val p = SCState.profile
+    val err = SCState.error
+    Column(modifier) {
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ SCState.open = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
+            Text("SoundCloud", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+        }
+        when {
+            err != null -> Text(err, Modifier.padding(16.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodyMedium)
+            p == null -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            else -> LazyColumn(Modifier.weight(1f)) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(120.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+                            if (p.avatar != null) AsyncImage(p.avatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        }
+                        Text(p.name, Modifier.fillMaxWidth().padding(top = 12.dp), color = Color.White, fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Text("Подписчиков: ${p.followers}, треков: ${p.trackCount}", Modifier.padding(top = 4.dp),
+                            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+                        if (p.about.isNotBlank()) Text(p.about.take(240), Modifier.fillMaxWidth().padding(top = 8.dp),
+                            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+                        Button({ if (p.tracks.isNotEmpty()) startPlay(p.tracks, 0) }, Modifier.padding(top = 14.dp), enabled = p.tracks.isNotEmpty()) {
+                            Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Слушать")
+                        }
+                        if (p.tracks.isEmpty()) Text("Доступных для воспроизведения треков нет", Modifier.padding(top = 8.dp),
+                            color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                itemsIndexed(p.tracks, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(p.tracks, i) } }
+                item { Spacer(Modifier.height(16.dp)) }
+            }
+        }
+    }
+}
+
 // ---------- состояние и интерфейс ----------
 
 class PaneState {
@@ -266,7 +360,7 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
                 LaunchedEffect(Unit) { YState.section = 1 }
                 YandexTab(c, np, startPlay, Modifier.weight(1f), showTabs = false)
             }
-            1 -> {
+            1 -> if (SCState.open) SoundCloudArtistScreen(np, startPlay, Modifier.weight(1f)) else {
                 Text("Платные треки Go+ играют только 30-секундное превью.", Modifier.padding(horizontal = 20.dp),
                     color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
                 if (SoundCloud.info.isNotBlank()) Text(SoundCloud.info, Modifier.padding(horizontal = 20.dp),

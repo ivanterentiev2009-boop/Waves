@@ -95,6 +95,9 @@ internal fun ArtFill(uri: Uri?) {
         contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(48.dp), tint = Color.White) }
 }
 
+/** Какая вкладка нижней панели открыта (0 волна, 1 коллекция, 2 поиск). */
+object NavState { var tab by mutableIntStateOf(0) }
+
 /**
  * Главная в стиле современных стриминговых приложений: крупный заголовок, композиция из обложек, большая кнопка,
  * карточка «Недавние», ленты с обложками и плавающая нижняя панель. Графика и значки нарисованы заново.
@@ -104,7 +107,7 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
                   onSettings: () -> Unit, onLyrics: () -> Unit) {
     val ctx = LocalContext.current
     LaunchedEffect(Unit) { Recent.init(ctx) }
-    var nav by remember { mutableIntStateOf(0) }
+    val nav = NavState.tab   // хранится глобально: не сбрасывается, пока открыт полноэкранный плеер
     var recentOpen by remember { mutableStateOf(false) }
     LaunchedEffect(np.id, np.playing) {
         val id = np.id ?: return@LaunchedEffect
@@ -129,7 +132,7 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
         }
         Column(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) {
             MiniPlayer(c, np, onLyrics)
-            NavBar(nav) { i -> if (i == 3) onSettings() else { nav = i; recentOpen = false } }
+            NavBar(nav) { i -> if (i == 3) onSettings() else { NavState.tab = i; recentOpen = false } }
         }
     }
 }

@@ -267,3 +267,38 @@ fun LoginDialog(onToken: (String) -> Unit, onClose: () -> Unit) {
         }
     }
 }
+
+/**
+ * Открывает страницу артиста играющего трека: для SoundCloud страницу автора на SoundCloud, иначе вкладку «Поиск»,
+ * Яндекс, профиль. Для треков Яндекса артист
+ * определяется точно, для остальных ищется по имени. Если не нашли, открывается поиск по имени.
+ */
+fun openArtistOf(scope: kotlinx.coroutines.CoroutineScope, np: NowPlaying, onOpened: () -> Unit) {
+    val name = np.artist.orEmpty().substringBefore(",").trim()
+    val tid = np.id
+    if (tid != null && tid.startsWith("sc")) {
+        // трек со SoundCloud: страница автора на SoundCloud
+        NavState.tab = 2; SrcState.src = 1
+        openSoundCloudArtist(scope, tid.removePrefix("sc"))
+        onOpened()
+        return
+    }
+    scope.launch {
+        var id: String? = null
+        if (YandexApi.token.isNotBlank()) id = withContext(Dispatchers.IO) {
+            var r: String? = null
+            if (tid != null && tid.startsWith("ym")) r = try { YandexApi.trackArtistId(tid.removePrefix("ym")) } catch (_: Exception) { null }
+            if (r == null && name.isNotBlank()) r = try { YandexApi.searchArtists(name).firstOrNull()?.id } catch (_: Exception) { null }
+            r
+        }
+        NavState.tab = 2; SrcState.src = 0; YState.section = 1
+        if (id != null) { YState.profileId = id; YState.profile = null; YState.profileError = null }
+        else if (name.isNotBlank()) YState.query = name
+        onOpened()
+        val pid = id ?: return@launch
+        try {
+            val p = withContext(Dispatchers.IO) { YandexApi.artistProfile(pid) }
+            if (YState.profileId == pid) YState.profile = p
+        } catch (e: Exception) { if (YState.profileId == pid) YState.profileError = "Ошибка: ${e.message}" }
+    }
+}

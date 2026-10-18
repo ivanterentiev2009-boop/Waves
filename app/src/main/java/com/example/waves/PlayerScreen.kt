@@ -71,7 +71,7 @@ private fun RoundBtn(icon: ImageVector, size: Int = 52, onClick: () -> Unit) {
 
 /** Полноэкранный плеер: обложка, текст песни (кнопка T), очередь, скорость, перемотка. */
 @Composable
-fun PlayerScreen(c: MediaController?, np: NowPlaying, onClose: () -> Unit) {
+fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {}, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -148,8 +148,11 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onClose: () -> Unit) {
 
             Text(np.title ?: "", Modifier.fillMaxWidth(), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(np.artist ?: "", Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp), color = Color.White.copy(0.7f),
-                fontSize = 20.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // имя артиста открывает его страницу
+            Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
+                Text(np.artist ?: "", Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onArtist).padding(horizontal = 14.dp, vertical = 4.dp),
+                    color = Color.White.copy(0.7f), fontSize = 20.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
 
             SeekSection(c, np, pos)
 
