@@ -202,12 +202,8 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                     }
                 }
                 1 -> {
-                    OutlinedTextField(YState.query, { YState.query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true,
-                        placeholder = { Text("Трек или исполнитель") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = { if (YState.query.isNotEmpty()) IconButton({ YState.query = "" }) { Icon(Icons.Default.Close, null) } },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { search(true) }))
+                    SearchField(YState.query, { YState.query = it }, "Трек или исполнитель",
+                        Modifier.padding(horizontal = 16.dp, vertical = 6.dp), onSearch = { search(true) })
                     LazyColumn(Modifier.weight(1f)) {
                         if (YState.artists.isNotEmpty()) {
                             item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }

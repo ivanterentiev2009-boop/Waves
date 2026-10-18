@@ -398,10 +398,8 @@ private fun TrackPane(key: String, hint: String, np: NowPlaying, startPlay: (Lis
         loading = false
     }
     Column(modifier) {
-        OutlinedTextField(st.query, { st.query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true,
-            placeholder = { Text(hint) }, leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = { if (st.query.isNotEmpty()) IconButton({ st.query = "" }) { Icon(Icons.Default.Close, null) } })
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp, 8.dp))
+        SearchField(st.query, { st.query = it }, hint, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp))
         st.status?.let { Text(it, Modifier.padding(16.dp, 8.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(st.results, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(st.results, i) } }

@@ -243,3 +243,36 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
         }
     }
 }
+
+/**
+ * Поисковая строка в стиле приложения: стеклянная «таблетка», значок поиска, акцентная рамка при вводе,
+ * кнопка очистки, на клавиатуре кнопка «Найти».
+ */
+@Composable
+fun SearchField(value: String, onValueChange: (String) -> Unit, hint: String, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val focused by androidx.compose.foundation.interaction.collectIsFocusedAsState(interaction)
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    val accent = Color(Style.accent)
+    val ring by animateColorAsState(if (focused) accent else Color.Transparent, tween(250), label = "sfr")
+    val icon by animateColorAsState(if (focused) accent else Color.White.copy(0.7f), tween(250), label = "sfi")
+    Frosted(CircleShape, modifier.fillMaxWidth().height(56.dp)) {
+        Row(Modifier.fillMaxSize().border(2.dp, ring, CircleShape).padding(start = 18.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Search, null, tint = icon)
+            Spacer(Modifier.width(12.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) Text(hint, color = Color.White.copy(0.5f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                androidx.compose.foundation.text.BasicTextField(value, onValueChange, Modifier.fillMaxWidth(), singleLine = true,
+                    interactionSource = interaction,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(accent),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSearch(); focus.clearFocus() }))
+            }
+            androidx.compose.animation.AnimatedVisibility(value.isNotEmpty()) {
+                IconButton({ onValueChange("") }) { Icon(Icons.Default.Close, "Очистить", tint = Color.White.copy(0.8f)) }
+            }
+        }
+    }
+}
