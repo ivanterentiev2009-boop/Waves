@@ -62,6 +62,10 @@ object SearchHistory {
         items.addAll(s.getString("items", "").orEmpty().split("\n").filter { it.isNotBlank() })
     }
 
+    fun remove(q: String) { items.remove(q); persist() }
+    fun clear() { items.clear(); persist() }
+    private fun persist() { sp?.edit()?.putString("items", items.joinToString("\n"))?.apply() }
+
     fun add(q: String) {
         val t = q.trim()
         if (t.isEmpty()) return
@@ -169,6 +173,10 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
             Column(Modifier.align(Alignment.BottomCenter).imePadding().navigationBarsPadding().padding(12.dp).fillMaxWidth()
                 .clip(shape).background(Color(0xF01E1E24)).border(1.dp, Color.White.copy(0.10f), shape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
+                if (q.isBlank() && SearchHistory.items.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Недавние", Modifier.weight(1f), color = Color.White.copy(0.6f), style = MaterialTheme.typography.labelLarge)
+                    TextButton({ SearchHistory.clear() }) { Text("Очистить", color = Color(Style.accent)) }
+                }
                 list.forEach { s ->
                     Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, tint = Color.White.copy(0.75f))
@@ -181,8 +189,8 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                             } else withStyle(SpanStyle(color = Color.White)) { append(s) }
                         }, Modifier.weight(1f).padding(vertical = 14.dp), style = MaterialTheme.typography.titleMedium,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        IconButton({ val n = s + " "; text = TextFieldValue(n, TextRange(n.length)) }) {
-                            Icon(Icons.Default.NorthWest, "Вставить в строку", tint = Color.White.copy(0.6f))
+                        IconButton({ if (q.isBlank()) SearchHistory.remove(s) else { val n = s + " "; text = TextFieldValue(n, TextRange(n.length)) } }) {
+                            if (q.isBlank()) Icon(Icons.Default.Close, "Удалить из истории", tint = Color.White.copy(0.6f)) else Icon(Icons.Default.NorthWest, "Вставить в строку", tint = Color.White.copy(0.6f))
                         }
                     }
                 }

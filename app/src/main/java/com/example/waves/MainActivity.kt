@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppData.init(this)
         val crashFile = java.io.File(filesDir, "crash.txt")
         val report = try { if (crashFile.exists()) crashFile.readText() else null } catch (_: Throwable) { null }
         Thread.setDefaultUncaughtExceptionHandler { _, e ->
@@ -94,6 +95,7 @@ fun Home(onSettings: () -> Unit) {
     }
     WaveFeeder(c, np)
     LyricsPrefetcher(c, np)
+    SleepTimerEffect(c)
     Crossfade(showLyrics, animationSpec = tween(350), label = "screen") { lyr ->
     if (lyr) PlayerScreen(c, np, onArtist = { openArtistOf(scope, np) { showLyrics = false } }) { showLyrics = false } else AppBackground(np.art) {
         StreamingHome(c, np, tracks, startPlayTop, onSettings) { showLyrics = true }

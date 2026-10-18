@@ -44,6 +44,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 
 /** Три вида «Моей волны» на главной (выбираются в настройках). Первый: тот, что был раньше. */
 val WAVE_STYLES = listOf(
@@ -278,11 +280,14 @@ fun WaveCard(t: Track, onClick: () -> Unit) {
 /** 1:46 из миллисекунд. */
 fun fmtDuration(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackRow(t: Track, sel: Boolean, onClick: () -> Unit) {
+fun TrackRow(t: Track, sel: Boolean, extra: List<Pair<String, () -> Unit>> = emptyList(), onClick: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape((Style.corner * 0.7f).dp))
         .background(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent)
-        .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        .combinedClickable(onClick = onClick, onLongClick = { menu = true }).padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Cover(t.art, 64); Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(t.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -294,4 +299,5 @@ fun TrackRow(t: Track, sel: Boolean, onClick: () -> Unit) {
             Text(fmtDuration(t.durationMs), color = Color(0xCCFFFFFF), fontSize = 14.sp)
         }
     }
+    if (menu) TrackMenu(t, extra) { menu = false }
 }

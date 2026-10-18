@@ -52,7 +52,7 @@ object WaveMix {
         }
         if ("local" in src) part { LocalSource(ctx).tracks().shuffled() }
         if ("sub" in src && Subsonic.configured) part { withContext(Dispatchers.IO) { Subsonic.tracks("") } }
-        if ("likes" in src && yandexOk) part { YState.likes.shuffled() }
+        if ("likes" in src && (yandexOk || Likes.local.isNotEmpty())) part { Likes.all().shuffled() }
         val out = interleave(lists)
         val err = firstErr
         if (out.isEmpty() && err != null) throw err

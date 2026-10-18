@@ -51,6 +51,9 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.net.Uri
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 
 private fun Modifier.fadeEdges(): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -74,6 +77,9 @@ private fun RoundBtn(icon: ImageVector, size: Int = 52, onClick: () -> Unit) {
 fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {}, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     val ctx = LocalContext.current
+    val curTrack = np.id?.let { Track(it, np.title ?: "", np.artist ?: "", np.uri ?: Uri.EMPTY, np.art) }
+    val likedNow = curTrack?.let { Likes.isLiked(it) } ?: false
+    var sleepOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var mode by remember { mutableIntStateOf(0) }          // 0 обложка, 1 текст, 2 очередь
     var menu by remember { mutableStateOf(false) }
@@ -121,14 +127,31 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                RoundBtn(if (likedNow) Icons.Default.Favorite else Icons.Default.FavoriteBorder) {
+                    curTrack?.let { t -> AppData.scope.launch { try { Likes.toggle(t) } catch (e: Exception) { appToast("Не получилось: ${e.message}") } } }
+                }
+                Spacer(Modifier.width(8.dp))
                 Box {
                     RoundBtn(Icons.Default.MoreVert) { menu = true }
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text("Загрузить текст из файла") }, { menu = false; picker.launch(arrayOf("*/*")) })
                         DropdownMenuItem({ Text("Сбросить текст трека") }, { menu = false; np.id?.let { Transcriber.clear(ctx, it) } })
+                        DropdownMenuItem({ Text("Скачать трек") }, { menu = false; curTrack?.let { t -> AppData.scope.launch { appToast(Downloader.run(ctx, t)) } } })
+                        DropdownMenuItem({ Text(if (SleepTimer.endAt > 0) "Таймер сна: ещё ${SleepTimer.leftMin()} мин" else "Таймер сна") }, { menu = false; sleepOpen = true })
                     }
                 }
             }
+
+            if (sleepOpen) AlertDialog(onDismissRequest = { sleepOpen = false },
+                title = { Text("Таймер сна") },
+                text = {
+                    Column {
+                        listOf(15, 30, 45, 60).forEach { m -> TextButton({ SleepTimer.start(m); sleepOpen = false }) { Text("Через $m минут") } }
+                        if (SleepTimer.endAt > 0) TextButton({ SleepTimer.cancel(); sleepOpen = false }) { Text("Выключить таймер") }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton({ sleepOpen = false }) { Text("Закрыть") } })
 
             // центр: обложка / текст / очередь
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {

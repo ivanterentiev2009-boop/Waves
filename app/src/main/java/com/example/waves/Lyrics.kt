@@ -61,13 +61,16 @@ object LyricsCache {
     /** Находит текст, если его ещё нет. Если этот трек уже ищет кто-то другой, просто ждёт его. */
     suspend fun ensure(id: String, title: String?, artist: String?, durSec: Int?) {
         if (map.containsKey(id) || misses[id]?.first == sig()) return
+        withContext(Dispatchers.IO) { LyricsDisk.load(id) }?.let { (src, lines) -> if (lines.isNotEmpty()) { map[id] = src to lines; return } }
         if (!inflight.add(id)) { while (inflight.contains(id)) delay(100); return }
         try {
             val notes = mutableListOf<String>()
             val found = withContext(Dispatchers.IO) { LyricSources.find(id, title, artist, durSec, notes) }
-            if (found != null) map[id] = found else misses[id] = sig() to notes.joinToString("\n")
+            if (found != null) { map[id] = found; LyricsDisk.save(id, found.first, found.second) } else misses[id] = sig() to notes.joinToString("\n")
         } finally { inflight.remove(id) }
     }
+
+    fun clearDisk() { LyricsDisk.clear(); map.clear(); misses.clear() }
 
     fun peek(id: String): LyricsData? {
         map[id]?.let { (src, l) -> if (l.isNotEmpty()) return LyricsData(l, "", src) }

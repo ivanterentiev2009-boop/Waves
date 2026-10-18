@@ -304,6 +304,7 @@ private fun LyricsPage(onBack: () -> Unit) {
             SwitchRow("Яндекс Музыка", Style.lyYandex, "Для её треков") { Style.lyYandex = it; Style.save() }
             SwitchRow("LRCLIB", Style.lyLrclib, "Открытая база, есть таймкоды") { Style.lyLrclib = it; Style.save() }
             SwitchRow("lyrics.ovh", Style.lyOvh, "Только обычный текст") { Style.lyOvh = it; Style.save() }
+            TextButton({ LyricsCache.clearDisk(); android.widget.Toast.makeText(AppData.app, "Сохранённые тексты удалены", android.widget.Toast.LENGTH_SHORT).show() }) { Text("Очистить сохранённые тексты") }
         }
     }
 }

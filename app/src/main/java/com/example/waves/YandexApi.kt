@@ -76,6 +76,12 @@ object YandexApi {
         return details((0 until minOf(arr.length(), 300)).map { arr.getJSONObject(it).get("id").toString() })
     }
 
+    /** Ставит или снимает лайк треку в аккаунте Яндекса. Нужен вход. */
+    fun setLike(trackId: String, like: Boolean) {
+        val id = uid ?: json("$BASE/account/status").getJSONObject("result").getJSONObject("account").get("uid").toString().also { uid = it }
+        json("$BASE/users/$id/likes/tracks/" + if (like) "add-multiple" else "remove", "track-ids=$trackId")
+    }
+
     fun search(q: String, page: Int = 0): List<Track> {
         val res = json("$BASE/search?text=${URLEncoder.encode(q, "UTF-8")}&nocorrect=false&type=track&page=$page")
             .getJSONObject("result").optJSONObject("tracks")?.optJSONArray("results") ?: return emptyList()

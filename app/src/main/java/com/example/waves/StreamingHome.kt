@@ -59,6 +59,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.PI
 import kotlin.math.sin
+import androidx.compose.material.icons.filled.Add
 
 /** Недавно играли: хранится на телефоне, последние 30 треков. */
 object Recent {
@@ -280,20 +281,77 @@ private fun RecentScreen(np: NowPlaying, startPlay: (List<Track>, Int) -> Unit, 
 @Composable
 private fun CollectionTab(np: NowPlaying, device: List<Track>, startPlay: (List<Track>, Int) -> Unit) {
     var part by remember { mutableIntStateOf(0) }
+    var openPl by remember { mutableStateOf<Playlist?>(null) }
+    var newOpen by remember { mutableStateOf(false) }
     LaunchedEffect(YandexApi.token) {
         if (YandexApi.token.isNotBlank() && YState.likes.isEmpty())
             try { YState.likes = withContext(Dispatchers.IO) { YandexApi.likes() } } catch (_: Exception) { }
     }
-    val list = if (part == 0) YState.likes else device
     Column(Modifier.fillMaxSize()) {
         Text("Коллекция", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-        Pill(listOf("Мне нравится", "На устройстве"), part, { part = it }, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
-            if (list.isEmpty()) item {
-                Text(if (part == 0) "Здесь появятся понравившиеся треки Яндекс Музыки" else "На устройстве не найдено музыки",
-                    Modifier.padding(24.dp), color = Color(0xB3FFFFFF))
+        Pill(listOf("Мне нравится", "На устройстве", "Плейлисты"), part, { part = it; openPl = null }, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        if (part == 2) {
+            val pl = openPl
+            if (pl == null) PlaylistList(Modifier.weight(1f), { openPl = it }, { newOpen = true })
+            else PlaylistDetail(pl, np, startPlay, Modifier.weight(1f)) { openPl = null }
+        } else {
+            val list = if (part == 0) Likes.all() else device
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+                if (list.isEmpty()) item {
+                    Text(if (part == 0) "Здесь будут треки, которые ты отметил сердечком" else "На устройстве не найдено музыки",
+                        Modifier.padding(24.dp), color = Color(0xB3FFFFFF))
+                }
+                itemsIndexed(list, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(list, i) } }
             }
-            itemsIndexed(list, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(list, i) } }
+        }
+    }
+    if (newOpen) NewPlaylistDialog({ Playlists.create(it); newOpen = false }, { newOpen = false })
+}
+
+@Composable
+private fun PlaylistList(modifier: Modifier, onOpen: (Playlist) -> Unit, onNew: () -> Unit) {
+    LazyColumn(modifier, contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(24.dp))
+                .clickable(onClick = onNew).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Add, null, tint = Color(Style.accent)); Spacer(Modifier.width(12.dp))
+                Text("Новый плейлист", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (Playlists.all.isEmpty()) item { Text("Плейлистов пока нет", Modifier.padding(24.dp), color = Color(0xB3FFFFFF)) }
+        items(Playlists.all, key = { it.id }) { p ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(24.dp))
+                .clickable { onOpen(p) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Cover(p.tracks.firstOrNull()?.art, 56); Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(p.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${p.tracks.size} треков", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+                }
+                Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistDetail(pl: Playlist, np: NowPlaying, startPlay: (List<Track>, Int) -> Unit, modifier: Modifier, onBack: () -> Unit) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
+            Column(Modifier.weight(1f)) {
+                Text(pl.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${pl.tracks.size} треков", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton({ Playlists.delete(pl.id); onBack() }) { Text("Удалить") }
+        }
+        if (pl.tracks.isNotEmpty()) Button({ startPlay(pl.tracks.toList(), 0) }, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+            Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Слушать")
+        }
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+            if (pl.tracks.isEmpty()) item { Text("Пусто. Нажми и держи трек и выбери «Добавить в плейлист».", Modifier.padding(24.dp), color = Color(0xB3FFFFFF)) }
+            itemsIndexed(pl.tracks, key = { _, t -> t.id }) { i, t ->
+                TrackRow(t, t.id == np.id, listOf("Удалить из плейлиста" to { Playlists.removeTrack(pl.id, t) })) { startPlay(pl.tracks.toList(), i) }
+            }
         }
     }
 }
