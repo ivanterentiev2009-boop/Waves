@@ -83,8 +83,8 @@ fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (I
         items.forEachIndexed { i, (icon, label) ->
             val on = i == selected
             val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "cb")
-            val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "cf")
-            val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "cl")
+            val fg by animateColorAsState(if (on) WP.onAccent else WP.text, tween(250), label = "cf")
+            val line by animateColorAsState(if (on) Color.Transparent else WP.line, tween(250), label = "cl")
             Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { onSelect(i) }
                 .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (icon != null) { Icon(icon, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }
@@ -97,7 +97,7 @@ fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (I
 @Composable
 private fun SourceBadge(text: String) {
     Box(Modifier.padding(end = 6.dp).size(32.dp).clip(CircleShape).background(DS.fillColor), contentAlignment = Alignment.Center) {
-        Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(text, color = WP.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -114,12 +114,12 @@ fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badg
         Row(Modifier.fillMaxSize().clickable {
             SearchHost.req = SearchReq(value, hint, badge, suggest) { q -> SearchHistory.add(q); onValueChange(q); onSearch() }
         }.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+            Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = WP.text2)
             Spacer(Modifier.width(DS.padM))
             Text(if (value.isBlank()) hint else value, Modifier.weight(1f),
-                color = if (value.isBlank()) Color.White.copy(DS.TEXT3) else Color.White,
+                color = if (value.isBlank()) WP.text3 else WP.text,
                 style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (value.isNotBlank()) IconButton({ onValueChange("") }, Modifier.size(DS.btn)) { Icon(Icons.Default.Close, "Очистить", Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2)) }
+            if (value.isNotBlank()) IconButton({ onValueChange("") }, Modifier.size(DS.btn)) { Icon(Icons.Default.Close, "Очистить", Modifier.size(DS.iconM), tint = WP.text2) }
             else SourceBadge(badge)
         }
     }
@@ -174,40 +174,40 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                 .clip(shape).background(Color(0xF01E1E24)).border(DS.stroke, DS.lineColor, shape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
                 if (q.isBlank() && SearchHistory.items.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Недавние", Modifier.weight(1f), color = Color.White.copy(0.6f), style = MaterialTheme.typography.labelLarge)
+                    Text("Недавние", Modifier.weight(1f), color = WP.text2, style = MaterialTheme.typography.labelLarge)
                     TextButton({ SearchHistory.clear() }) { Text("Очистить", color = Color(Style.accent)) }
                 }
                 list.forEach { s ->
                     Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+                        Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, Modifier.size(DS.iconM), tint = WP.text2)
                         Spacer(Modifier.width(DS.padM))
                         val starts = q.isNotEmpty() && s.startsWith(q, ignoreCase = true)
                         Text(buildAnnotatedString {
                             if (starts) {
-                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(s.take(q.length)) }
-                                withStyle(SpanStyle(color = Color.White.copy(0.65f))) { append(s.drop(q.length)) }
-                            } else withStyle(SpanStyle(color = Color.White)) { append(s) }
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = WP.text)) { append(s.take(q.length)) }
+                                withStyle(SpanStyle(color = WP.text2)) { append(s.drop(q.length)) }
+                            } else withStyle(SpanStyle(color = WP.text)) { append(s) }
                         }, Modifier.weight(1f).padding(vertical = 10.dp), style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         IconButton({ if (q.isBlank()) SearchHistory.remove(s) else { val n = s + " "; text = TextFieldValue(n, TextRange(n.length)) } }) {
-                            if (q.isBlank()) Icon(Icons.Default.Close, "Удалить из истории", tint = Color.White.copy(0.6f)) else Icon(Icons.Default.NorthWest, "Вставить в строку", tint = Color.White.copy(0.6f))
+                            if (q.isBlank()) Icon(Icons.Default.Close, "Удалить из истории", tint = WP.text2) else Icon(Icons.Default.NorthWest, "Вставить в строку", tint = WP.text2)
                         }
                     }
                 }
-                if (list.isNotEmpty()) HorizontalDivider(color = Color.White.copy(0.08f))
+                if (list.isNotEmpty()) HorizontalDivider(color = WP.line)
                 Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = accent)
                     Spacer(Modifier.width(DS.padM))
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (text.text.isEmpty()) Text(hint, color = Color.White.copy(0.45f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        if (text.text.isEmpty()) Text(hint, color = WP.text3, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         BasicTextField(text, { text = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
-                            textStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White),
+                            textStyle = MaterialTheme.typography.titleMedium.copy(color = WP.text),
                             cursorBrush = SolidColor(accent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { submit(text.text) }))
                     }
                     if (text.text.isNotEmpty()) IconButton({ text = TextFieldValue("") }) {
-                        Icon(Icons.Default.Close, "Очистить", tint = Color.White.copy(0.8f))
+                        Icon(Icons.Default.Close, "Очистить", tint = WP.text)
                     }
                     SourceBadge(badge)
                 }
@@ -231,12 +231,12 @@ fun WaveSourceChips(modifier: Modifier = Modifier) {
         Style.save()
     }
     Column(modifier) {
-        Text("Откуда музыка в волне", color = Color.White.copy(0.7f), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+        Text("Откуда музыка в волне", color = WP.text2, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             chips.forEachIndexed { i, (label, on) ->
                 val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "wsb")
-                val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "wsf")
-                val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "wsl")
+                val fg by animateColorAsState(if (on) WP.onAccent else WP.text, tween(250), label = "wsf")
+                val line by animateColorAsState(if (on) Color.Transparent else WP.line, tween(250), label = "wsl")
                 Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { toggle(i) }
                     .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (on) { Icon(Icons.Default.Check, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }

@@ -57,6 +57,7 @@ object Style {
     var ovStart by mutableIntStateOf(1)        // 0 пузырёк, 1 компактный, 2 полный
     var layout by mutableIntStateOf(1)          // 0 классический, 1 как в стриминговых приложениях
     var bgArt by mutableStateOf<Uri?>(null)     // обложка на фоне (для размытия под панелями)
+    var barStyle by mutableIntStateOf(0)        // нижние панели: 0 строгие (на всю ширину), 1 плавающие капсулы
     var waveStyle by mutableIntStateOf(0)       // вид «Моей волны»
     var lyYandex by mutableStateOf(true)      // источники текстов
     var lyLrclib by mutableStateOf(true)
@@ -77,12 +78,12 @@ object Style {
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
         ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
-        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws3", 0).coerceIn(0, 2); layout = s.getInt("lay", 1); waveYandex = s.getBoolean("wmy", true); waveSc = s.getBoolean("wms", false); waveLocal = s.getBoolean("wml", false); waveSub = s.getBoolean("wmu", false); waveLikes = s.getBoolean("wmk", false)
+        lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws3", 0).coerceIn(0, 2); barStyle = s.getInt("bst", 0).coerceIn(0, 1); layout = s.getInt("lay", 1); waveYandex = s.getBoolean("wmy", true); waveSc = s.getBoolean("wms", false); waveLocal = s.getBoolean("wml", false); waveSub = s.getBoolean("wmu", false); waveLikes = s.getBoolean("wmk", false)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
             ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)
-            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws3", waveStyle)?.putInt("lay", layout)?.putBoolean("wmy", waveYandex)?.putBoolean("wms", waveSc)?.putBoolean("wml", waveLocal)?.putBoolean("wmu", waveSub)?.putBoolean("wmk", waveLikes)?.apply()
+            ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws3", waveStyle)?.putInt("bst", barStyle)?.putInt("lay", layout)?.putBoolean("wmy", waveYandex)?.putBoolean("wms", waveSc)?.putBoolean("wml", waveLocal)?.putBoolean("wmu", waveSub)?.putBoolean("wmk", waveLikes)?.apply()
     }
 }
 
@@ -147,37 +148,43 @@ private fun Modifier.liquidLayer(): Modifier {
         }
         shader.setFloatUniform("rects", arr)
         shader.setFloatUniform("radius", radius)
-        shader.setFloatUniform("k", Style.refract)
+        shader.setFloatUniform("k", Style.refract.coerceIn(0.3f, 1.0f))
         renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
     }
 }
 
-/** Панель: стекло (с преломлением на Android 13+) / минимализм / AMOLED. */
+/**
+ * Панель-карточка. Все темы дают достаточно плотную подложку, чтобы текст читался на любой обложке.
+ * Преломление (только Android 13+ и только у мини-плеера) тоже лежит на тёмной подложке.
+ */
 fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false): Modifier =
     if (refract && glassCapable) composed {
         val id = remember { java.util.UUID.randomUUID().toString() }
         DisposableEffect(id) { onDispose { GlassRects.map.remove(id) } }
         Modifier.onGloballyPositioned { GlassRects.map[id] = it.boundsInRoot() }
             .clip(shape)
-            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.45f), Color.White.copy(0.05f), Color.White.copy(0.25f))), shape)
+            .background(Color(0xFF101016).copy(alpha = (0.74f * strength).coerceIn(0f, 1f)))
+            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.30f), Color.White.copy(0.06f), Color.White.copy(0.18f))), shape)
     } else when (Style.theme) {
         0 -> this.clip(shape)
-            .background(Color.Black.copy(alpha = 0.34f * strength))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(Style.glass + 0.06f), Color.White.copy(Style.glass * 0.4f))))
-            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.30f), Color.White.copy(DS.LINE * 0.5f), Color.White.copy(0.18f))), shape)
-        1 -> this.clip(shape).background(Color(0xFF17171C).copy(alpha = strength))
-            .border(DS.stroke, DS.lineColor, shape)
-        3 -> this.clip(shape)          // матовое стекло: ровная приглушённая панель, без бликов и градиентов
-            .background(Color(0xFF1B1B22).copy(alpha = ((0.50f + Style.glass * 0.6f).coerceAtMost(0.9f)) * strength))
-            .border(DS.stroke, DS.lineColor, shape)
-        else -> this.clip(shape).background(Color.Black.copy(alpha = strength))
-            .border(DS.stroke, DS.lineColor, shape)
+            .background(Color(0xFF14141B).copy(alpha = (0.84f * strength).coerceIn(0f, 1f)))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(0.06f), Color.White.copy(0.015f))))
+            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.20f), Color.White.copy(0.06f), Color.White.copy(0.12f))), shape)
+        1 -> this.clip(shape).background(WP.surface.copy(alpha = strength))
+            .border(DS.stroke, WP.line, shape)
+        3 -> this.clip(shape)          // матовое стекло: ровная плотная панель, без бликов и градиентов
+            .background(Color(0xFF1B1B22).copy(alpha = ((0.80f + Style.glass * 0.5f).coerceAtMost(0.95f)) * strength))
+            .border(DS.stroke, WP.line, shape)
+        4 -> this.clip(shape).background(WP.surface.copy(alpha = strength))
+            .border(DS.stroke, WP.line, shape)
+        else -> this.clip(shape).background(WP.surface.copy(alpha = strength))
+            .border(DS.stroke, WP.line, shape)
     }
 
 @Composable
 fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
     SideEffect { Style.bgArt = art }
-    val base = when (Style.theme) { 2 -> Color.Black; 1 -> Color(0xFF0B0B0E); else -> Color(0xFF08080D) }
+    val base = WP.bg
     val haze = remember { HazeState() }
     CompositionLocalProvider(LocalHaze provides haze) {
     Box(Modifier.fillMaxSize().background(base)) {
@@ -187,13 +194,16 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
             val layer = if (glassCapable) Modifier.fillMaxSize().liquidLayer() else Modifier.fillMaxSize()
             Box(layer) {
                 val a = Color(Style.accent)
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(a.copy(0.30f), Color.Transparent), Offset(250f, 350f), 1500f)))
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.12f), Color.Transparent), Offset(900f, 1500f), 1300f)))
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.10f), Color.Transparent), Offset(100f, 2000f), 1300f)))
-                if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 3.dp else 28.dp).alpha(if (glassCapable) 0.75f else 0.38f), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(a.copy(0.20f), Color.Transparent), Offset(250f, 350f), 1500f)))
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.07f), Color.Transparent), Offset(900f, 1500f), 1300f)))
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.06f), Color.Transparent), Offset(100f, 2000f), 1300f)))
+                if (art != null) SoftArt(art, Modifier.fillMaxSize(), 0.28f)   // мягкая обложка без дорогого blur-прохода
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(0.22f)))
             }
         } else if (Style.theme == 3) {
             MatteBackdrop(art, 8.dp, Modifier.fillMaxSize())
+        } else if (Style.theme == 4) {
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(Style.accent).copy(0.16f), Color.Transparent), startY = 0f, endY = 1100f)))
         }
       }
         content()
@@ -210,7 +220,7 @@ private fun Modifier.refractSelf(radiusPx: Float?, alphaValue: Float): Modifier 
         val arr = FloatArray(32); arr[2] = size.width; arr[3] = size.height   // одна область = вся панель
         shader.setFloatUniform("rects", arr)
         shader.setFloatUniform("radius", radius)
-        shader.setFloatUniform("k", Style.refract)
+        shader.setFloatUniform("k", Style.refract.coerceIn(0.3f, 1.0f))
         renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
     }
 }
@@ -250,7 +260,7 @@ fun MatteBackdrop(art: Uri?, artBlur: androidx.compose.ui.unit.Dp, modifier: Mod
     Box(modifier) {
         Box(Modifier.fillMaxSize().background(Color(0xFF111116)))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint.copy(0.35f), Color(0xFF111116), tint.copy(0.20f)))))
-        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.35f), contentScale = ContentScale.Crop)
+        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.22f), contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(0.10f)))
     }
 }
@@ -269,7 +279,7 @@ fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = fals
         .hazeEffect(haze) {
             backgroundColor = Color(0xFF1B1B22)
             blurRadius = 16.dp
-            tints = listOf(HazeTint(Color.White.copy(0.06f + Style.glass * 0.16f)))
+            tints = listOf(HazeTint(Color(0xFF16161C).copy(0.66f)))
             noiseFactor = 0.02f
         }
         .border(DS.stroke, DS.lineColor, shape), content = content)

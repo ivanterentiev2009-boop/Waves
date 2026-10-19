@@ -15,7 +15,9 @@ data class NowPlaying(val title: String? = null, val artist: String? = null,
 
 @Composable
 fun rememberController(): MediaController? {
-    val ctx = LocalContext.current
+    // контекст приложения, а не сервиса/активности: release() выполняется асинхронно, и к этому моменту
+    // оверлей-сервис уже уничтожен, а unbindService на нём бросает «Service not registered»
+    val ctx = LocalContext.current.applicationContext
     var c by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(Unit) {
         val f = MediaController.Builder(ctx, SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))).buildAsync()

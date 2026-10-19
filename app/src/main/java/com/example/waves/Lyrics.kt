@@ -205,9 +205,9 @@ fun LyricRow(l: LyricLine, i: Int, active: Int, synced: Boolean, big: Boolean, p
     val t = l.text.ifBlank { "♪" }
     if (synced && i == active && l.timeMs != null) {
         val start = l.timeMs
-        Text(karaoke(t, start, nextMs ?: (start + 4000), pos.value, Color.White, Color.White.copy(0.4f), l.wordTimes),
+        Text(karaoke(t, start, nextMs ?: (start + 4000), pos.value, WP.text, WP.text3, l.wordTimes),
             mod, fontSize = fs, lineHeight = lh, fontWeight = FontWeight.Bold)
-    } else Text(t, mod, color = Color.White, fontSize = fs, lineHeight = lh, fontWeight = FontWeight.Bold)
+    } else Text(t, mod, color = WP.text, fontSize = fs, lineHeight = lh, fontWeight = FontWeight.Bold)
 }
 
 /** Экран текста: строки подсвечиваются по времени, тап по строке перематывает. */
@@ -244,13 +244,13 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
     AppBackground(np.art) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
+                IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = WP.text) }
                 Column(Modifier.weight(1f)) {
-                    Text(np.title ?: "", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(np.artist ?: "", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    if (lyr.source.isNotEmpty()) Text("Источник: ${lyr.source}", color = Color(0x80FFFFFF), style = MaterialTheme.typography.labelSmall)
+                    Text(np.title ?: "", color = WP.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(np.artist ?: "", color = WP.text2, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    if (lyr.source.isNotEmpty()) Text("Источник: ${lyr.source}", color = WP.text3, style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton({ picker.launch(arrayOf("*/*")) }) { Icon(Icons.Default.UploadFile, null, tint = Color.White) }
+                IconButton({ picker.launch(arrayOf("*/*")) }) { Icon(Icons.Default.UploadFile, null, tint = WP.text) }
             }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 if (lyr.lines.isEmpty()) EmptyLyrics(lyr.status, np)
@@ -263,8 +263,8 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
             SeekBar(c, pos)
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically) {
-                val tintS by animateColorAsState(if (np.shuffle) Color(Style.accent) else Color.White, label = "sh")
-                val tintR by animateColorAsState(if (np.repeat != 0) Color(Style.accent) else Color.White, label = "rp")
+                val tintS by animateColorAsState(if (np.shuffle) Color(Style.accent) else WP.text, label = "sh")
+                val tintR by animateColorAsState(if (np.repeat != 0) Color(Style.accent) else WP.text, label = "rp")
                 IconButton({ c?.shuffleModeEnabled = !np.shuffle }) { Icon(Icons.Default.Shuffle, null, tint = tintS) }
                 Controls(c, np.playing)
                 IconButton({ c?.repeatMode = (np.repeat + 1) % 3 }) {
@@ -282,9 +282,9 @@ private fun SeekBar(c: MediaController?, pos: State<Long>) {
     Column(Modifier.padding(horizontal = 24.dp)) {
         Slider(if (dur > 0) (p.toFloat() / dur).coerceIn(0f, 1f) else 0f, { c?.seekTo((it * dur).toLong()) })
         Row {
-            Text(fmt(p), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+            Text(fmt(p), color = WP.text2, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.weight(1f))
-            Text(fmt(dur), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+            Text(fmt(dur), color = WP.text2, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -294,14 +294,14 @@ fun EmptyLyrics(status: String, np: NowPlaying) {
     val ctx = LocalContext.current
     val id = np.id
     Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(status, color = Color(0xB3FFFFFF), textAlign = TextAlign.Center)
+        Text(status, color = WP.text2, textAlign = TextAlign.Center)
         if (id != null && !id.startsWith("ym") && Style.subsEnabled) {
             LaunchedEffect(Unit) { Transcriber.refresh(ctx) }
             val p = Transcriber.progress[id]
             when {
                 p != null -> {
                     LinearProgressIndicator({ p }, Modifier.fillMaxWidth())
-                    Text("Распознавание… ${(p * 100).toInt()}%", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    Text("Распознавание… ${(p * 100).toInt()}%", color = WP.text2, style = MaterialTheme.typography.bodySmall)
                 }
                 !(if (Style.asrEngine == 1) Transcriber.gigaReady else Transcriber.modelReady) -> {
                     val giga = Style.asrEngine == 1
@@ -313,7 +313,7 @@ fun EmptyLyrics(status: String, np: NowPlaying) {
                 }
                 else -> Button({ np.uri?.let { Transcriber.start(ctx, id, it) } }, enabled = np.uri != null) { Text("Распознать текст") }
             }
-            Transcriber.errors[id]?.let { Text("Ошибка: $it", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+            Transcriber.errors[id]?.let { Text("Ошибка: $it", color = WP.error, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
@@ -360,7 +360,7 @@ fun LyricTicker(lyr: LyricsData, pos: State<Long>, show: Boolean, onClick: () ->
             if (line != null && line.text.isNotBlank()) {
                 val start = line.timeMs ?: 0L
                 val next = lines.getOrNull(idx + 1)?.timeMs
-                Text(karaoke(line.text, start, next ?: (start + 4000), pos.value, Color.White, Color.White.copy(0.45f), line.wordTimes),
+                Text(karaoke(line.text, start, next ?: (start + 4000), pos.value, WP.text, WP.text3, line.wordTimes),
                     Modifier.fillMaxWidth()
                         .clickable(noRipple, null, onClick = onClick)
                         .basicMarquee(iterations = Int.MAX_VALUE),
@@ -380,15 +380,15 @@ fun SyncBanner(np: NowPlaying, lines: List<LyricLine>) {
     val p = Transcriber.progress[id]
     val ready = if (Style.asrEngine == 1) Transcriber.gigaReady else Transcriber.modelReady
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("У этого текста нет времени строк", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+        Text("У этого текста нет времени строк", color = WP.text2, style = MaterialTheme.typography.bodySmall)
         when {
             p != null -> {
                 LinearProgressIndicator({ p }, Modifier.fillMaxWidth())
-                Text("Синхронизация… ${(p * 100).toInt()}%", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+                Text("Синхронизация… ${(p * 100).toInt()}%", color = WP.text2, style = MaterialTheme.typography.bodySmall)
             }
-            !ready -> Text("Чтобы синхронизировать, скачай модель распознавания в настройках", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+            !ready -> Text("Чтобы синхронизировать, скачай модель распознавания в настройках", color = WP.text3, style = MaterialTheme.typography.bodySmall)
             else -> OutlinedButton({ np.uri?.let { Transcriber.startAlign(ctx, id, it, lines) } }, enabled = np.uri != null) { Text("Синхронизировать по голосу") }
         }
-        Transcriber.errors[id]?.let { Text("Ошибка: $it", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+        Transcriber.errors[id]?.let { Text("Ошибка: $it", color = WP.error, style = MaterialTheme.typography.bodySmall) }
     }
 }

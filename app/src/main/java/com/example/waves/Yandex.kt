@@ -157,11 +157,11 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
 
     Column(modifier) {
         if (YandexApi.token.isBlank()) {
-            Column(Modifier.padding(16.dp).fillMaxWidth().panel(DS.shapeM, refract = true).padding(DS.padL),
+            Column(Modifier.padding(16.dp).fillMaxWidth().panel(DS.shapeM).padding(DS.padL),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Вход в Яндекс Музыку", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text("Вход в Яндекс Музыку", color = WP.text, style = MaterialTheme.typography.titleMedium)
                 Text("Нажми «Войти через Яндекс», войди в аккаунт и разреши доступ: токен подхватится сам. Если не получилось, вставь адрес страницы или токен вручную ниже.",
-                    color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    color = WP.text2, style = MaterialTheme.typography.bodySmall)
                 FilledTonalButton({ showLogin = true }) { Text("Войти через Яндекс") }
                 OutlinedTextField(input, { input = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Адрес или токен") })
                 Button({ if (input.isNotBlank()) YandexApi.saveToken(input) }, enabled = input.isNotBlank()) { Text("Войти") }
@@ -181,7 +181,7 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                 { YState.section = it; status = null; if (it == 2 && YState.likes.isEmpty()) loadLikes() },
                 Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp, 8.dp))
-            status?.let { Text(it, Modifier.padding(16.dp, 4.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+            status?.let { Text(it, Modifier.padding(16.dp, 4.dp), color = WP.error, style = MaterialTheme.typography.bodySmall) }
             when (YState.section) {
                 0 -> {
                     val idx = YState.wave.indexOfFirst { it.id == cur }
@@ -196,13 +196,13 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                                 onToggle = { if (!Wave.active) startWave() else if (np.playing) c?.pause() else c?.play() })
                         }
                         if (upcoming.isNotEmpty()) {
-                            item { Text("Дальше в волне", Modifier.padding(start = 20.dp, top = 8.dp, bottom = 10.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            item { Text("Дальше в волне", Modifier.padding(start = 20.dp, top = 8.dp, bottom = 10.dp), color = WP.text, style = MaterialTheme.typography.titleMedium) }
                             item {
                                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     items(upcoming, key = { it.id }) { tr -> WaveCard(tr) { playAt(tr) } }
                                 }
                             }
-                            item { Text("Все треки волны", Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                            item { Text("Все треки волны", Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp), color = WP.text, style = MaterialTheme.typography.titleMedium) }
                             itemsIndexed(YState.wave, key = { _, tr -> tr.id }) { _, tr -> TrackRow(tr, tr.id == cur) { playAt(tr) } }
                         }
                         item { Spacer(Modifier.height(16.dp)) }
@@ -217,13 +217,13 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                         val f = YState.filter
                         if (f != 1 && YState.artists.isNotEmpty()) {
                             if (f == 0) {
-                                item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                                item { Text("Исполнители", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = WP.text, style = MaterialTheme.typography.titleMedium) }
                                 item {
                                     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         items(YState.artists, key = { it.id }) { a -> ArtistChip(a) { openArtist(a.id) } }
                                     }
                                 }
-                                if (YState.results.isNotEmpty()) item { Text("Треки", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp), color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                                if (YState.results.isNotEmpty()) item { Text("Треки", Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp), color = WP.text, style = MaterialTheme.typography.titleMedium) }
                             } else items(YState.artists, key = { it.id }) { a -> ArtistRow(a) { openArtist(a.id) } }
                         }
                         if (f != 2) {
@@ -235,10 +235,10 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
                 }
                 else -> {
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Мне нравится", Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        IconButton({ loadLikes() }) { Icon(Icons.Default.Refresh, null, tint = Color.White) }
+                        Text("Мне нравится", Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.titleMedium)
+                        IconButton({ loadLikes() }) { Icon(Icons.Default.Refresh, null, tint = WP.text) }
                         IconButton({ YandexApi.logout(); YState.likes = emptyList(); YState.results = emptyList(); YState.wave = emptyList(); Wave.active = false }) {
-                            Icon(Icons.Default.Logout, null, tint = Color.White)
+                            Icon(Icons.Default.Logout, null, tint = WP.text)
                         }
                     }
                     TrackList(YState.likes, -1, { i -> onPlay(YState.likes, i) }, Modifier.weight(1f), currentId = cur)
@@ -272,7 +272,7 @@ fun LoginDialog(onToken: (String) -> Unit, onClose: () -> Unit) {
                 }
             })
             IconButton(onClose, Modifier.align(Alignment.TopEnd).statusBarsPadding()) {
-                Icon(Icons.Default.Close, null, tint = Color.White)
+                Icon(Icons.Default.Close, null, tint = WP.text)
             }
         }
     }

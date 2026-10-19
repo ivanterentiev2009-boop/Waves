@@ -32,13 +32,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
-private val dimText = Color(0xB3FFFFFF)
+private val dimText get() = WP.text2
 
 @Composable
 fun Avatar(uri: Uri?, size: Int) {
-    Box(Modifier.size(size.dp).clip(CircleShape).background(Color(0x22FFFFFF)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size.dp).clip(CircleShape).background(WP.fill), contentAlignment = Alignment.Center) {
         if (uri != null) AsyncImage(uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        else Icon(Icons.Default.Person, null, Modifier.size((size / 2).dp), tint = Color.White)
+        else Icon(Icons.Default.Person, null, Modifier.size((size / 2).dp), tint = WP.text)
     }
 }
 
@@ -47,7 +47,7 @@ fun ArtistChip(a: ArtistItem, onClick: () -> Unit) {
     Column(Modifier.width(96.dp).clip(DS.shapeM).clickable(onClick = onClick).padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Avatar(a.cover, 80)
-        Text(a.name, Modifier.padding(top = 6.dp), color = Color.White, style = MaterialTheme.typography.bodySmall,
+        Text(a.name, Modifier.padding(top = 6.dp), color = WP.text, style = MaterialTheme.typography.bodySmall,
             maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -56,7 +56,7 @@ fun ArtistChip(a: ArtistItem, onClick: () -> Unit) {
 private fun AlbumCard(al: AlbumItem, onClick: () -> Unit) {
     Column(Modifier.width(140.dp).clip(DS.shapeM).clickable(onClick = onClick)) {
         Cover(al.cover, 140)
-        Text(al.title, Modifier.padding(top = 8.dp), color = Color.White, fontWeight = FontWeight.Medium,
+        Text(al.title, Modifier.padding(top = 8.dp), color = WP.text, fontWeight = FontWeight.Medium,
             style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (al.year.isNotBlank()) Text(al.year, color = dimText, style = MaterialTheme.typography.labelSmall)
     }
@@ -64,7 +64,7 @@ private fun AlbumCard(al: AlbumItem, onClick: () -> Unit) {
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, Modifier.padding(start = 20.dp, top = 20.dp, bottom = 10.dp), color = Color.White, style = MaterialTheme.typography.titleMedium)
+    Text(text, Modifier.padding(start = 20.dp, top = 20.dp, bottom = 10.dp), color = WP.text, style = MaterialTheme.typography.titleMedium)
 }
 
 /** Профиль исполнителя: популярные треки, альбомы (тап запускает альбом), похожие исполнители. */
@@ -74,7 +74,7 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
     BackHandler(onBack = onBack)
     val p = YState.profile
     Box(modifier) {
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = WindowInsets.navigationBars.asPaddingValues()) {
             item {
                 Box(Modifier.fillMaxWidth()) {
                     AsyncImage(p?.artist?.cover, null, Modifier.matchParentSize().blur(24.dp).alpha(0.30f), contentScale = ContentScale.Crop)
@@ -82,7 +82,7 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         Avatar(p?.artist?.cover, 140)
                         Spacer(Modifier.height(12.dp))
-                        Text(p?.artist?.name ?: "Загрузка…", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold,
+                        Text(p?.artist?.name ?: "Загрузка…", color = WP.text, fontSize = 30.sp, fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center)
                         val meta = listOf(p?.artist?.genres.orEmpty(), p?.artist?.sub.orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
                         if (meta.isNotBlank()) Text(meta, Modifier.padding(top = 4.dp), color = dimText, style = MaterialTheme.typography.bodySmall,
@@ -98,7 +98,7 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
                 item {
                     Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                         val err = YState.profileError
-                        if (err != null) Text(err, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+                        if (err != null) Text(err, color = WP.error, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                         else CircularProgressIndicator()
                     }
                 }
@@ -127,7 +127,7 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
             }
         }
         IconButton(onBack, Modifier.align(Alignment.TopStart).padding(4.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = WP.text)
         }
     }
 }
@@ -139,8 +139,8 @@ fun ArtistRow(a: ArtistItem, onClick: () -> Unit) {
         .clickable(onClick = onClick).padding(DS.padS), verticalAlignment = Alignment.CenterVertically) {
         Avatar(a.cover, 56); Spacer(Modifier.width(DS.padM))
         Column(Modifier.weight(1f)) {
-            Text(a.name, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (a.sub.isNotBlank()) Text(a.sub, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(a.name, color = WP.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (a.sub.isNotBlank()) Text(a.sub, color = WP.text2, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

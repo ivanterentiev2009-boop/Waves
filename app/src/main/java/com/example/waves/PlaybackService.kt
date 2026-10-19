@@ -38,13 +38,14 @@ class PlaybackService : MediaSessionService() {
             .setAudioAttributes(AudioAttributes.DEFAULT, true)
             .setHandleAudioBecomingNoisy(true).build()
         p.addListener(object : Player.Listener {
-            override fun onAudioSessionIdChanged(audioSessionId: Int) = startViz()
+            override fun onAudioSessionIdChanged(audioSessionId: Int) { startViz(); Eq.attach(audioSessionId) }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying && viz == null) startViz()
                 if (!isPlaying) VizBus.clear()
             }
         })
         player = p
+        Eq.init(this); Eq.attach(p.audioSessionId)
         session = MediaSession.Builder(this, p).build()
     }
 
@@ -70,7 +71,7 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(info: MediaSession.ControllerInfo) = session
 
     override fun onDestroy() {
-        stopViz()
+        stopViz(); Eq.release()
         session?.run { player.release(); release() }
         session = null
         super.onDestroy()

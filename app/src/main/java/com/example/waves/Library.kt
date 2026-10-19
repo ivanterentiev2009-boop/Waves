@@ -259,8 +259,8 @@ object LyricsDisk {
 private fun SheetItem(icon: ImageVector?, label: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        if (icon != null) { Icon(icon, null, tint = Color.White.copy(0.85f)); Spacer(Modifier.width(16.dp)) }
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (icon != null) { Icon(icon, null, tint = WP.text); Spacer(Modifier.width(16.dp)) }
+        Text(label, color = WP.text, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -282,11 +282,11 @@ fun TrackMenu(t: Track, extra: List<Pair<String, () -> Unit>>, onDismiss: () -> 
     var page by remember { mutableIntStateOf(0) }
     var newOpen by remember { mutableStateOf(false) }
     val liked = Likes.isLiked(t)
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF1A1A22)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = WP.surfaceHi) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text(t.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(t.artist, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t.title, color = WP.text, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t.artist, color = WP.text2, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (page == 0) {
                 SheetItem(if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,

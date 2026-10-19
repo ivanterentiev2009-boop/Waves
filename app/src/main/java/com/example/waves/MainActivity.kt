@@ -8,7 +8,9 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -31,6 +33,8 @@ import androidx.compose.ui.unit.sp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // единый режим «под системными панелями» на всех версиях Android: отступы дают statusBars/navigationBars/ime
+        enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         AppData.init(this)
         val crashFile = java.io.File(filesDir, "crash.txt")
         val report = try { if (crashFile.exists()) crashFile.readText() else null } catch (_: Throwable) { null }
@@ -58,15 +62,15 @@ class MainActivity : ComponentActivity() {
 private fun CrashScreen(text: String, onContinue: () -> Unit) {
     val clip = androidx.compose.ui.platform.LocalClipboardManager.current
     Column(Modifier.fillMaxSize().background(Color(0xFF08080D)).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
-        Text("Приложение закрылось с ошибкой", color = Color.White, fontSize = 22.sp)
-        Text("Нажми «Скопировать» и пришли текст в чат.", color = Color(0xB3FFFFFF), modifier = Modifier.padding(vertical = 8.dp))
+        Text("Приложение закрылось с ошибкой", color = WP.text, fontSize = 22.sp)
+        Text("Нажми «Скопировать» и пришли текст в чат.", color = WP.text2, modifier = Modifier.padding(vertical = 8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ clip.setText(androidx.compose.ui.text.AnnotatedString(text)) }) { Text("Скопировать") }
             OutlinedButton(onContinue) { Text("Продолжить") }
         }
         androidx.compose.foundation.text.selection.SelectionContainer(
             Modifier.weight(1f).padding(top = 12.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-            Text(text.take(6000), color = Color(0xFFFFB4AB), fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+            Text(text.take(6000), color = WP.error, fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
         }
     }
 }

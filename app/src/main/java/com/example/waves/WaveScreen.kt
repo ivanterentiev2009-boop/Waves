@@ -91,39 +91,39 @@ private fun PlayOrb(size: Dp, playing: Boolean, loading: Boolean, bars: State<Fl
 }
 
 @Composable
-private fun BoxScope.OverlayButton(onOverlay: (() -> Unit)?, onShake: (() -> Unit)? = null) {
+private fun BoxScope.OverlayButton(onOverlay: (() -> Unit)?, onShake: (() -> Unit)? = null, tint: Color = WP.text) {
     Row(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 6.dp)) {
-        if (onShake != null) IconButton(onShake) { Icon(Icons.Default.Refresh, "Стряхнуть волну", tint = Color.White) }
-        if (onOverlay != null) IconButton(onOverlay) { Icon(Icons.Default.PictureInPicture, "Оверлей", tint = Color.White) }
+        if (onShake != null) IconButton(onShake) { Icon(Icons.Default.Refresh, "Стряхнуть волну", tint = tint) }
+        if (onOverlay != null) IconButton(onOverlay) { Icon(Icons.Default.PictureInPicture, "Оверлей", tint = tint) }
     }
 }
 
-/** Кнопка «Стряхнуть волну»: загружает новую подборку той же волны. */
+/** Кнопка «Стряхнуть волну»: загружает новую подборку той же волны. Тёмная капсула читается на любом фоне. */
 @Composable
 private fun ShakeChip(modifier: Modifier, onShake: () -> Unit) {
     val rot = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    Row(modifier.clip(CircleShape).background(DS.fillColor).border(DS.stroke, DS.lineColor, CircleShape)
+    Row(modifier.clip(CircleShape).background(Color.Black.copy(0.50f)).border(DS.stroke, Color.White.copy(0.22f), CircleShape)
         .clickable { scope.launch { rot.snapTo(0f); rot.animateTo(360f, tween(500)) }; onShake() }
         .padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Refresh, null, Modifier.size(DS.iconS).graphicsLayer { rotationZ = rot.value }, tint = Color.White)
+        Icon(Icons.Default.Refresh, null, Modifier.size(DS.iconS).graphicsLayer { rotationZ = rot.value }, tint = WP.onArt)
         Spacer(Modifier.width(8.dp))
-        Text("Стряхнуть волну", color = Color.White, style = MaterialTheme.typography.labelLarge)
+        Text("Стряхнуть волну", color = WP.onArt, style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }
 }
 
-/** Плитка волны (по артисту или по песне): обложка с подписью и цветным оттенком. */
+/** Плитка волны (по артисту или по песне): обложка с тёмным градиентом, оттенок задаёт цвет волны. Текст всегда светлый. */
 @Composable
 private fun WaveTile(label: String, name: String?, art: Uri?, tint: Color, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = DS.shapeL
-    Box(modifier.clip(shape).background(DS.fillColor)
+    val shape = DS.shapeM
+    Box(modifier.clip(shape).background(WP.fill)
         .then(if (active) Modifier.border(DS.strokeSel, Color(Style.accent), shape) else Modifier)
         .clickable(onClick = onClick)) {
         ArtFill(art)
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(tint.copy(0.30f), Color.Black.copy(0.72f)))))
-        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 10.dp, vertical = 9.dp)) {
-            Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            if (!name.isNullOrBlank()) Text(name, color = Color.White.copy(0.8f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(tint.copy(0.25f), Color.Black.copy(0.78f)))))
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = DS.padM, vertical = 10.dp)) {
+            Text(label, color = WP.onArt, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+            if (!name.isNullOrBlank()) Text(name, color = WP.onArt2, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -131,7 +131,8 @@ private fun WaveTile(label: String, name: String?, art: Uri?, tint: Color, activ
 private fun FloatArray.at(i: Int): Float = if (isEmpty()) 0f else this[i.coerceIn(0, size - 1)]
 
 // ---------- 1. Коллаж ----------
-// слева основной трек, справа сверху волна по артисту, справа снизу волна по песне
+// заголовок и оверлей в одной строке; большая карточка текущей волны; под ней две равные плитки «По артисту» и «По песне».
+// Волнистая линия живёт только в средней зоне карточки: над подписью и кнопкой, ничего не пересекает.
 @Composable
 private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: Boolean, loading: Boolean,
                         bars: State<FloatArray>, bob: State<Float>, onToggle: () -> Unit, onOverlay: (() -> Unit)?,
@@ -140,41 +141,48 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
     val accent = Color(Style.accent)
     val mainShape = DS.shapeL
     val tileArt = extra.getOrNull(0) ?: art
-    Box(Modifier.fillMaxWidth().height(450.dp)) {
-        // волнистая лента на фоне
-        Canvas(Modifier.fillMaxSize()) {
-            val path = Path(); val steps = 50
-            for (s in 0..steps) {
-                val x = size.width * s / steps
-                val y = size.height * 0.56f + sin(s * 0.22f + bob.value) * 34.dp.toPx() - (x / size.width) * 150.dp.toPx()
-                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            drawPath(path, Color.White.copy(0.09f), style = Stroke(34.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-            drawPath(path, accent.copy(0.20f), style = Stroke(12.dp.toPx(), cap = StrokeCap.Round))
+    Column(Modifier.fillMaxWidth().padding(horizontal = DS.padL)) {
+        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Моя волна", Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (onOverlay != null) IconButton(onOverlay) { Icon(Icons.Default.PictureInPicture, "Оверлей", Modifier.size(DS.iconM), tint = WP.text) }
         }
-        Text("Моя\nволна", Modifier.padding(start = 20.dp, top = 12.dp), color = Color.White, fontSize = 72.sp,
-            lineHeight = 70.sp, fontWeight = FontWeight.Black)
-        OverlayButton(onOverlay)
-        // основной трек
-        Box(Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 178.dp).size(176.dp)
-            .graphicsLayer { translationY = sin(bob.value) * 6.dp.toPx(); rotationZ = -3f }
-            .clip(mainShape).background(DS.fillColor)
+        Spacer(Modifier.height(DS.padS))
+        Box(Modifier.fillMaxWidth().aspectRatio(1.35f).clip(mainShape).background(WP.fill)
             .then(if (activeKind == "wave") Modifier.border(DS.strokeSel, accent, mainShape) else Modifier)
-            .clickable { onStation?.invoke("wave") }) { ArtFill(art) }
-        WaveTile("По артисту", artistName, tileArt, Color(0xFFFF8AD8), activeKind == "artist",
-            Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 74.dp).size(108.dp)
-                .graphicsLayer { translationY = sin(bob.value + 1.5f) * 7.dp.toPx(); rotationZ = 5f }) { onStation?.invoke("artist") }
-        WaveTile("По песне", songName, tileArt, Color(0xFF5CC8FF), activeKind == "song",
-            Modifier.align(Alignment.TopEnd).padding(end = 30.dp, top = 196.dp).size(108.dp)
-                .graphicsLayer { translationY = sin(bob.value + 3f) * 7.dp.toPx(); rotationZ = -4f }) { onStation?.invoke("song") }
-        Row(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, bottom = 66.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(DS.TEXT2), modifier = Modifier.size(DS.iconS))
-            Spacer(Modifier.width(8.dp))
-            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White.copy(0.9f),
-                style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.widthIn(max = 200.dp))
+            .clickable { onStation?.invoke("wave") }) {
+            ArtFill(art)
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(colorStops = arrayOf(0.30f to Color.Transparent, 1f to Color.Black.copy(0.84f)))))
+            Canvas(Modifier.matchParentSize()) {
+                val path = Path(); val steps = 40
+                for (st in 0..steps) {
+                    val x = size.width * st / steps
+                    val y = size.height * 0.50f + sin(st * 0.30f + bob.value) * 9.dp.toPx()
+                    if (st == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path, accent.copy(0.55f), style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            }
+            if (onShake != null) ShakeChip(Modifier.align(Alignment.TopStart).padding(DS.padM), onShake)
+            Column(Modifier.align(Alignment.BottomStart).padding(start = DS.padL, bottom = DS.padL, end = 104.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.GraphicEq, null, Modifier.size(DS.iconS), tint = WP.onArt2)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (np.title != null) "Сейчас в волне" else "Бесконечная подборка", color = WP.onArt2,
+                        style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+                if (np.title != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(np.title, color = WP.onArt, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (!np.artist.isNullOrBlank()) Text(np.artist, color = WP.onArt2, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            PlayOrb(72.dp, playing, loading, bars, Modifier.align(Alignment.BottomEnd).padding(end = DS.padL, bottom = DS.padL), onToggle)
         }
-        if (onShake != null) ShakeChip(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 16.dp), onShake)
-        PlayOrb(92.dp, playing, loading, bars, Modifier.align(Alignment.BottomEnd).padding(end = 22.dp, bottom = 14.dp), onToggle)
+        Spacer(Modifier.height(DS.padM))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DS.padM)) {
+            WaveTile("По артисту", artistName, tileArt, Color(0xFFFF8AD8), activeKind == "artist", Modifier.weight(1f).aspectRatio(1.7f)) { onStation?.invoke("artist") }
+            WaveTile("По песне", songName, extra.getOrNull(1) ?: tileArt, Color(0xFF5CC8FF), activeKind == "song", Modifier.weight(1f).aspectRatio(1.7f)) { onStation?.invoke("song") }
+        }
     }
 }
 
@@ -203,7 +211,7 @@ private fun PulseHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Bool
                     strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
             }
         }
-        Text("Моя волна", Modifier.padding(start = 20.dp, top = 16.dp), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+        Text("Моя волна", Modifier.padding(start = 20.dp, top = 16.dp), color = WP.text, fontSize = 28.sp, fontWeight = FontWeight.Black)
         OverlayButton(onOverlay, onShake)
         Box(Modifier.align(Alignment.TopCenter).padding(top = 115.dp).size(140.dp)
             .graphicsLayer {
@@ -211,12 +219,12 @@ private fun PulseHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Bool
                 val e = if (playing && b.isNotEmpty()) b.average().toFloat() else 0f
                 scaleX = 1f + e * 0.08f; scaleY = 1f + e * 0.08f
             }
-            .clip(CircleShape).background(Color(0x22FFFFFF))) { ArtFill(art) }
+            .clip(CircleShape).background(WP.fill)) { ArtFill(art) }
         Column(Modifier.align(Alignment.TopCenter).padding(top = 330.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White, fontSize = 22.sp,
+            Text(if (np.title != null) np.title else "Бесконечная подборка", color = WP.text, fontSize = 22.sp,
                 fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (np.title != null) (np.artist ?: "") else "Нажми, чтобы начать", color = Color(0xB3FFFFFF),
+            Text(if (np.title != null) (np.artist ?: "") else "Нажми, чтобы начать", color = WP.text2,
                 style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         PlayOrb(76.dp, playing, loading, bars, Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp), onToggle)
@@ -252,16 +260,16 @@ private fun SurfHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Boole
                 drawPath(path, col.copy(alpha))
             }
         }
-        Text("Моя\nволна", Modifier.padding(start = 20.dp, top = 14.dp), color = Color.White, fontSize = 52.sp,
+        Text("Моя\nволна", Modifier.padding(start = 20.dp, top = 14.dp), color = WP.onArt, fontSize = 52.sp,
             lineHeight = 52.sp, fontWeight = FontWeight.Black)
-        OverlayButton(onOverlay, onShake)
+        OverlayButton(onOverlay, onShake, WP.onArt)
         Box(Modifier.align(Alignment.TopCenter).padding(top = 150.dp).size(100.dp)
             .graphicsLayer { translationY = sin(bob.value) * 7.dp.toPx(); rotationZ = sin(bob.value) * 4f }
             .clip(DS.shapeL).background(DS.fillColor)) { ArtFill(art) }
         Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 20.dp).widthIn(max = 220.dp)) {
-            Text(if (np.title != null) np.title else "Бесконечная подборка", color = Color.White,
+            Text(if (np.title != null) np.title else "Бесконечная подборка", color = WP.onArt,
                 fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (np.title != null) Text(np.artist ?: "", color = Color.White.copy(0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            if (np.title != null) Text(np.artist ?: "", color = WP.onArt, style = MaterialTheme.typography.bodySmall, maxLines = 1)
         }
         PlayOrb(84.dp, playing, loading, bars, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 18.dp), onToggle)
     }
@@ -270,10 +278,10 @@ private fun SurfHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Boole
 @Composable
 fun WaveCard(t: Track, onClick: () -> Unit) {
     Column(Modifier.width(140.dp).clip(DS.shapeM).clickable(onClick = onClick)) {
-        Cover(t.art, 140)
-        Text(t.title, Modifier.padding(top = 8.dp), color = Color.White, fontWeight = FontWeight.Medium,
+        Cover(t.art, 140, DS.shapeM)
+        Text(t.title, Modifier.padding(top = 8.dp), color = WP.text, fontWeight = FontWeight.Medium,
             style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(t.artist, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(t.artist, color = WP.text2, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -285,19 +293,17 @@ fun fmtDuration(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s
 fun TrackRow(t: Track, sel: Boolean, extra: List<Pair<String, () -> Unit>> = emptyList(), onClick: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(horizontal = DS.padM).clip(DS.shapeM)
-        .background(if (sel) Color(Style.accent).copy(DS.SEL) else Color.Transparent)
+        .background(if (sel) WP.selFill else Color.Transparent)
         .combinedClickable(onClick = onClick, onLongClick = { menu = true }).padding(horizontal = DS.padS, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Cover(t.art, 56); Spacer(Modifier.width(DS.padM))
+        Cover(t.art, DS.coverRow); Spacer(Modifier.width(DS.padM))
         Column(Modifier.weight(1f)) {
-            Text(t.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(t.artist, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(t.title, color = if (sel) WP.accentInk else WP.text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(t.artist, color = WP.text2, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (sel) Icon(Icons.Default.GraphicEq, null, Modifier.padding(start = DS.padS).size(DS.iconM), tint = Color(Style.accent))
-        if (t.durationMs > 0) Box(Modifier.padding(start = 10.dp).clip(CircleShape).background(DS.fillColor)
-            .border(DS.stroke, DS.lineColor, CircleShape).padding(horizontal = 10.dp, vertical = 5.dp)) {
-            Text(fmtDuration(t.durationMs), color = Color(0xCCFFFFFF), fontSize = 12.sp)
-        }
+        if (sel) Icon(Icons.Default.GraphicEq, null, Modifier.padding(start = DS.padS).size(DS.iconM), tint = WP.accentInk)
+        if (t.durationMs > 0) Text(fmtDuration(t.durationMs), Modifier.padding(start = DS.padM), color = WP.text3,
+            style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
     if (menu) TrackMenu(t, extra) { menu = false }
 }

@@ -44,12 +44,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val dimText = Color(0xB3FFFFFF)
-private val faintText = Color(0x80FFFFFF)
-private val errText = Color(0xFFFFB4AB)
+private val dimText get() = WP.text2
+private val faintText get() = WP.text3
+private val errText get() = WP.error
 
-private val THEME_NAMES = listOf("Стекло", "Матовое стекло", "Минимализм", "AMOLED")
-private val THEME_IDS = listOf(0, 3, 1, 2)
+private val THEME_NAMES = listOf("Стекло", "Матовое стекло", "Минимализм", "AMOLED", "Светлая")
+private val THEME_IDS = listOf(0, 3, 1, 2, 4)
 
 private fun themeName(id: Int) = THEME_NAMES[THEME_IDS.indexOf(id).coerceAtLeast(0)]
 
@@ -58,9 +58,9 @@ private fun themeName(id: Int) = THEME_NAMES[THEME_IDS.indexOf(id).coerceAtLeast
 /** Группа настроек: стеклянная карточка с заголовком, как «Недавние» на главной. */
 @Composable
 private fun Group(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true).padding(DS.padL),
+    Column(Modifier.fillMaxWidth().panel(DS.shapeM).padding(DS.padL),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (title != null) Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        if (title != null) Text(title, color = WP.text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         content()
     }
 }
@@ -70,8 +70,8 @@ private fun Group(title: String? = null, content: @Composable ColumnScope.() -> 
 private fun Page(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
-            Text(title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = WP.text) }
+            Text(title, color = WP.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
     }
@@ -85,17 +85,17 @@ private fun Hint(text: String) {
 /** Строка раздела на главной странице настроек: значок, название, краткое текущее значение. */
 @Composable
 private fun NavRow(icon: ImageVector, title: String, summary: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true)
+    Row(Modifier.fillMaxWidth().panel(DS.shapeM)
         .clickable(onClick = onClick).padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(40.dp).clip(CircleShape).background(Color(Style.accent)), contentAlignment = Alignment.Center) {
             Icon(icon, null, Modifier.size(DS.iconM), tint = Color.Black)
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text(title, color = WP.text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text(summary, color = dimText, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+        Icon(Icons.Default.ChevronRight, null, tint = WP.text2)
     }
 }
 
@@ -106,7 +106,7 @@ private fun SwitchRow(label: String, value: Boolean, hint: String? = null, onCha
     Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { onChange(!value) }.padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(label, color = Color.White)
+            Text(label, color = WP.text)
             if (hint != null) Text(hint, color = dimText, style = MaterialTheme.typography.bodySmall)
         }
         Switch(value, onChange)
@@ -118,7 +118,7 @@ private fun SliderRow(label: String, valueText: String, value: Float, range: Clo
                       onChange: (Float) -> Unit) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, Modifier.weight(1f), color = Color.White)
+            Text(label, Modifier.weight(1f), color = WP.text)
             Text(valueText, color = dimText, style = MaterialTheme.typography.bodyMedium)
         }
         Slider(value, onChange, valueRange = range, onValueChangeFinished = Style::save)
@@ -134,19 +134,21 @@ private fun ThemeTile(id: Int, modifier: Modifier) {
         0 -> Brush.linearGradient(listOf(accent.copy(0.75f), Color(0xFFFF8AD8).copy(0.55f), Color(0xFF5CC8FF).copy(0.55f)))
         3 -> Brush.verticalGradient(listOf(Color(0xFF2C2C36), Color(0xFF1B1B22)))
         1 -> SolidColor(Color(0xFF17171C))
+        4 -> SolidColor(Color(0xFFF4F4F8))
         else -> SolidColor(Color.Black)
     }
-    val border by animateColorAsState(if (sel) accent else Color.White.copy(DS.LINE), tween(250), label = "tb")
+    val border by animateColorAsState(if (sel) accent else WP.line, tween(250), label = "tb")
     val shape = DS.shapeM
     Column(modifier.clip(shape).border(if (sel) DS.strokeSel else DS.stroke, border, shape)
         .clickable { Style.theme = id; Style.save() }.padding(6.dp)) {
         Box(Modifier.fillMaxWidth().height(58.dp).clip(DS.shapeS).background(preview)) {
             // «панелька» внутри миниатюры показывает, как выглядят карточки в теме
             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).fillMaxWidth(0.62f).height(14.dp)
-                .clip(CircleShape).background(Color.White.copy(if (id == 0) 0.28f else 0.12f)))
+                .clip(CircleShape).background(if (id == 4) Color.White else Color.White.copy(if (id == 0) 0.28f else 0.12f))
+                .border(1.dp, if (id == 4) Color(0x24000000) else Color.Transparent, CircleShape))
         }
         Row(Modifier.padding(start = 6.dp, end = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(themeName(id), Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.labelLarge,
+            Text(themeName(id), Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sel) Icon(Icons.Default.Check, null, Modifier.size(16.dp), tint = accent)
         }
@@ -184,9 +186,9 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
     var advancedOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
+            IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = WP.text) }
         }
-        Text("Настройки", Modifier.padding(start = 20.dp, bottom = 16.dp), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+        Text("Настройки", Modifier.padding(start = 20.dp, bottom = 16.dp), color = WP.text, fontSize = 34.sp, fontWeight = FontWeight.Bold)
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             NavRow(Icons.Default.Palette, "Оформление", "${themeName(Style.theme)}, скругление ${Style.corner}") { open(0) }
             NavRow(Icons.Default.GraphicEq, "Моя волна", WAVE_STYLES[Style.waveStyle.coerceIn(0, WAVE_STYLES.lastIndex)].first) { open(1) }
@@ -196,16 +198,16 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
                 "Яндекс: " + (if (YandexApi.token.isNotBlank()) "вход выполнен" else "не выполнен") +
                     ", SoundCloud: " + (if (SoundCloud.hasKey) "ключ есть" else "нет ключа")) { open(5) }
             NavRow(Icons.Default.Subtitles, "Тексты песен", "Автоматический поиск и синхронизация") { open(3) }
-            Row(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true).clickable { advancedOpen = !advancedOpen }.padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(0.10f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Mic, null, Modifier.size(DS.iconM), tint = Color.White)
+            Row(Modifier.fillMaxWidth().panel(DS.shapeM).clickable { advancedOpen = !advancedOpen }.padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(WP.fill), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Mic, null, Modifier.size(DS.iconM), tint = WP.text)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Дополнительные настройки", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("Дополнительные настройки", color = WP.text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Text("Распознавание, модели и тонкая настройка", color = dimText, style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(if (advancedOpen) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+                Icon(if (advancedOpen) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = WP.text2)
             }
             if (advancedOpen) {
                 NavRow(Icons.Default.Mic, "Распознавание текста",
@@ -229,13 +231,20 @@ private fun LookPage(onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ThemeTile(THEME_IDS[2], Modifier.weight(1f)); ThemeTile(THEME_IDS[3], Modifier.weight(1f))
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ThemeTile(THEME_IDS[4], Modifier.weight(1f)); Spacer(Modifier.weight(1f))
+            }
+        }
+        Group("Нижние панели") {
+            Text("Мини-плеер и навигация", color = WP.text2, style = MaterialTheme.typography.bodySmall)
+            Pill(listOf("Строгие", "Капсулы"), Style.barStyle, { Style.barStyle = it; Style.save() })
         }
         Group("Акцентный цвет") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf(0xFFB69CFF, 0xFF7CC4FF, 0xFF6EE7B7, 0xFFFF8AD8, 0xFFFFB86B, 0xFFFFFFFF).forEach { l ->
                     val c = l.toInt()
                     Box(Modifier.size(40.dp).clip(CircleShape).background(Color(c))
-                        .border(if (Style.accent == c) DS.strokeSel else 0.dp, Color.White.copy(0.9f), CircleShape)
+                        .border(if (Style.accent == c) DS.strokeSel else 0.dp, WP.text, CircleShape)
                         .clickable { Style.accent = c; Style.save() }, contentAlignment = Alignment.Center) {
                         if (Style.accent == c) Icon(Icons.Default.Check, null, Modifier.size(DS.iconM), tint = Color.Black)
                     }
@@ -246,10 +255,10 @@ private fun LookPage(onBack: () -> Unit) {
         Group {
             Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { fineTune = !fineTune }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Тонкая настройка", color = Color.White, fontWeight = FontWeight.Medium)
+                    Text("Тонкая настройка", color = WP.text, fontWeight = FontWeight.Medium)
                     Hint("Прозрачность, преломление и скругление")
                 }
-                Icon(if (fineTune) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+                Icon(if (fineTune) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = WP.text2)
             }
             if (fineTune) {
                 SliderRow("Прозрачность стекла", "${(Style.glass / 0.30f * 100).toInt()}%", Style.glass, 0.04f..0.30f) { Style.glass = it }
@@ -283,7 +292,7 @@ private fun WavePage(onBack: () -> Unit) {
                     .clickable { Style.waveStyle = i; Style.save() }.padding(horizontal = DS.padM, vertical = DS.padS),
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(name, color = Color.White, fontWeight = FontWeight.Medium)
+                        Text(name, color = WP.text, fontWeight = FontWeight.Medium)
                         Text(desc, color = dimText, style = MaterialTheme.typography.bodySmall)
                     }
                     if (sel) Icon(Icons.Default.Check, null, tint = Color(Style.accent))
@@ -301,7 +310,7 @@ private fun OverlayPage(onBack: () -> Unit) {
         var advancedOverlay by remember { mutableStateOf(false) }
         Hint("Управляй музыкой поверх других приложений. Изменения применяются сразу.")
         Group("Вид") {
-            Text("Вид при запуске", color = Color.White)
+            Text("Вид при запуске", color = WP.text)
             Pill(listOf("Пузырёк", "Компактный", "Полный"), Style.ovStart, { Style.ovStart = it; Style.save() })
         }
         Group("Что показывать") {
@@ -312,17 +321,17 @@ private fun OverlayPage(onBack: () -> Unit) {
         Group {
             Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { advancedOverlay = !advancedOverlay }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Дополнительные параметры", color = Color.White, fontWeight = FontWeight.Medium)
+                    Text("Дополнительные параметры", color = WP.text, fontWeight = FontWeight.Medium)
                     Hint("Размер, прозрачность и системное размытие")
                 }
-                Icon(if (advancedOverlay) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+                Icon(if (advancedOverlay) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = WP.text2)
             }
             if (advancedOverlay) {
                 SliderRow("Размер", "${(Style.ovScale * 100).toInt()}%", Style.ovScale, 0.7f..1.4f) { Style.ovScale = it }
                 SliderRow("Плотность", "${(Style.overlayAlpha * 100).toInt()}%", Style.overlayAlpha, 0.3f..1f) { Style.overlayAlpha = it }
-                HorizontalDivider(color = Color.White.copy(0.10f))
+                HorizontalDivider(color = WP.line)
                 Text(if (blurOk) "Размытие окон на устройстве доступно" else "На этом устройстве размытие окон отключено или не поддерживается",
-                    color = if (blurOk) Color(0xFF6EE7B7) else errText, style = MaterialTheme.typography.bodySmall)
+                    color = if (blurOk) WP.ok else errText, style = MaterialTheme.typography.bodySmall)
                 SwitchRow("Системное размытие фона", Style.blurBehind, "Android 12+. Углы размытия могут быть квадратными.") { Style.blurBehind = it; Style.save() }
             }
         }
@@ -363,9 +372,9 @@ private fun RecognitionPage(onBack: () -> Unit) {
             Group("GigaAM") {
                 Hint("Для русского заметно точнее Vosk, слова подсвечиваются по точному времени. Модель около 285 МБ. " +
                     "Лицензия модели некоммерческая: только для личного использования.")
-                Text(if (Transcriber.gigaReady) "Модель установлена" else "Модель не скачана", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                Text(if (Transcriber.gigaReady) "Модель установлена" else "Модель не скачана", color = WP.text, style = MaterialTheme.typography.bodyMedium)
                 if (Transcriber.gigaBusy) {
-                    Text(Transcriber.gigaStage, color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text(Transcriber.gigaStage, color = WP.text, style = MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator({ Transcriber.gigaProgress }, Modifier.fillMaxWidth())
                 }
                 Transcriber.gigaError?.let { Text(it, color = errText, style = MaterialTheme.typography.bodySmall) }
@@ -375,9 +384,9 @@ private fun RecognitionPage(onBack: () -> Unit) {
         }
         if (Style.subsEnabled && Style.asrEngine == 0) {
             Group("Vosk") {
-                Text("Активная модель: " + Transcriber.activeModel.ifBlank { "не выбрана" }, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                Text("Активная модель: " + Transcriber.activeModel.ifBlank { "не выбрана" }, color = WP.text, style = MaterialTheme.typography.bodyMedium)
                 if (Transcriber.modelBusy) {
-                    Text("${Transcriber.modelName}: ${Transcriber.modelStage}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text("${Transcriber.modelName}: ${Transcriber.modelStage}", color = WP.text, style = MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator({ Transcriber.modelProgress }, Modifier.fillMaxWidth())
                 }
                 Transcriber.modelError?.let { Text(it, color = errText, style = MaterialTheme.typography.bodySmall) }
@@ -387,7 +396,7 @@ private fun RecognitionPage(onBack: () -> Unit) {
             if (Transcriber.installed.isNotEmpty()) Group("Установленные модели") {
                 Transcriber.installed.forEach { name ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(name + if (name == Transcriber.activeModel) "  ✓" else "", Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                        Text(name + if (name == Transcriber.activeModel) "  ✓" else "", Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.bodyMedium)
                         if (name != Transcriber.activeModel) TextButton({ Transcriber.select(ctx, name) }) { Text("Выбрать") }
                         TextButton({ Transcriber.deleteModel(ctx, name) }) { Text("Удалить") }
                     }
@@ -419,9 +428,9 @@ private fun SoundCloudWebDialog(onKey: (String) -> Unit, onClose: () -> Unit) {
                 }
             })
             Text("Подожди, пока страница загрузится: ключ поймается сам", Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 16.dp, top = 12.dp, end = 64.dp),
-                color = Color.White, style = MaterialTheme.typography.bodySmall)
+                color = WP.text, style = MaterialTheme.typography.bodySmall)
             IconButton(onClose, Modifier.align(Alignment.TopEnd).statusBarsPadding()) {
-                Icon(Icons.Default.Close, null, tint = Color.White)
+                Icon(Icons.Default.Close, null, tint = WP.text)
             }
         }
     }
@@ -439,7 +448,7 @@ private fun ServicesPage(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
     var ok by remember { mutableStateOf(true) }
-    val green = Color(0xFF6EE7B7)
+    val green = WP.ok
     if (yLogin) LoginDialog(onToken = { url -> YandexApi.saveToken(url); yLogin = false }, onClose = { yLogin = false })
     if (scWeb) SoundCloudWebDialog(
         onKey = { k -> SoundCloud.setKey(k, "через сайт"); scWeb = false; msg = "Ключ получен с сайта"; ok = true },
@@ -458,7 +467,7 @@ private fun ServicesPage(onBack: () -> Unit) {
             Text(if (SoundCloud.hasKey) "Ключ есть" + (if (SoundCloud.how.isNotBlank()) " (${SoundCloud.how})" else "") else "Ключа пока нет",
                 color = if (SoundCloud.hasKey) green else dimText)
             Hint("Ключ нужен для поиска и воспроизведения. Вход в аккаунт не требуется. Выбери любой способ, начни с первого.")
-            Text("Способ 1. Автоматически", color = Color.White, fontWeight = FontWeight.Medium)
+            Text("Способ 1. Автоматически", color = WP.text, fontWeight = FontWeight.Medium)
             Hint("Приложение само найдёт ключ на сайте SoundCloud.")
             Button({
                 scope.launch {
@@ -473,18 +482,18 @@ private fun ServicesPage(onBack: () -> Unit) {
             }, enabled = !busy) { Text(if (busy) "Ищу…" else "Получить автоматически") }
             Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { showScAdvanced = !showScAdvanced }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Другие способы подключения", color = Color.White, fontWeight = FontWeight.Medium)
+                    Text("Другие способы подключения", color = WP.text, fontWeight = FontWeight.Medium)
                     Hint("Через сайт или вручную — если автоматический способ не сработал")
                 }
-                Icon(if (showScAdvanced) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+                Icon(if (showScAdvanced) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = WP.text2)
             }
             if (showScAdvanced) {
-                HorizontalDivider(color = Color.White.copy(0.10f))
-                Text("Через сайт", color = Color.White, fontWeight = FontWeight.Medium)
+                HorizontalDivider(color = WP.line)
+                Text("Через сайт", color = WP.text, fontWeight = FontWeight.Medium)
                 Hint("Откроется soundcloud.com. Дождись загрузки страницы, ключ поймается автоматически.")
                 Button({ scWeb = true }) { Text("Открыть soundcloud.com") }
-                HorizontalDivider(color = Color.White.copy(0.10f))
-                Text("Вставить вручную", color = Color.White, fontWeight = FontWeight.Medium)
+                HorizontalDivider(color = WP.line)
+                Text("Вставить вручную", color = WP.text, fontWeight = FontWeight.Medium)
                 Hint("Для тех, у кого уже есть ключ или ссылка с client_id=.")
                 OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Ключ или ссылка") })
                 Button({

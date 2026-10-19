@@ -314,29 +314,29 @@ private fun SoundCloudArtistScreen(np: NowPlaying, startPlay: (List<Track>, Int)
     val err = SCState.error
     Column(modifier) {
         Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton({ SCState.open = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
-            Text("SoundCloud", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+            IconButton({ SCState.open = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = WP.text) }
+            Text("SoundCloud", color = WP.text2, style = MaterialTheme.typography.bodyMedium)
         }
         when {
-            err != null -> Text(err, Modifier.padding(16.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodyMedium)
+            err != null -> Text(err, Modifier.padding(16.dp), color = WP.error, style = MaterialTheme.typography.bodyMedium)
             p == null -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else -> LazyColumn(Modifier.weight(1f)) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(120.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+                        Box(Modifier.size(120.dp).clip(CircleShape).background(WP.fill)) {
                             if (p.avatar != null) AsyncImage(p.avatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }
-                        Text(p.name, Modifier.fillMaxWidth().padding(top = 12.dp), color = Color.White, fontSize = 28.sp,
+                        Text(p.name, Modifier.fillMaxWidth().padding(top = 12.dp), color = WP.text, fontSize = 28.sp,
                             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Text("Подписчиков: ${p.followers}, треков: ${p.trackCount}", Modifier.padding(top = 4.dp),
-                            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+                            color = WP.text2, style = MaterialTheme.typography.bodyMedium)
                         if (p.about.isNotBlank()) Text(p.about.take(240), Modifier.fillMaxWidth().padding(top = 8.dp),
-                            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+                            color = WP.text2, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                         Button({ if (p.tracks.isNotEmpty()) startPlay(p.tracks, 0) }, Modifier.padding(top = 14.dp), enabled = p.tracks.isNotEmpty()) {
                             Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Слушать")
                         }
                         if (p.tracks.isEmpty()) Text("Доступных для воспроизведения треков нет", Modifier.padding(top = 8.dp),
-                            color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                            color = WP.text3, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 itemsIndexed(p.tracks, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(p.tracks, i) } }
@@ -380,14 +380,14 @@ fun SourcesTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>, Int
             }
             1 -> if (SCState.open) SoundCloudArtistScreen(np, startPlay, Modifier.weight(1f)) else {
                 Text("Платные треки Go+ играют только 30-секундное превью.", Modifier.padding(horizontal = 20.dp),
-                    color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    color = WP.text3, style = MaterialTheme.typography.bodySmall)
                 if (SoundCloud.info.isNotBlank()) Text(SoundCloud.info, Modifier.padding(horizontal = 20.dp),
-                    color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+                    color = WP.text3, style = MaterialTheme.typography.bodySmall)
                 TrackPane("sc", "Трек или исполнитель на SoundCloud", "SC", { SoundCloud.suggest(it) }, np, startPlay, Modifier.weight(1f)) { SoundCloud.search(it) }
             }
             2 -> if (Subsonic.configured) {
                 Row(Modifier.padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(Subsonic.url.substringAfter("://"), Modifier.weight(1f), color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    Text(Subsonic.url.substringAfter("://"), Modifier.weight(1f), color = WP.text2, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                     TextButton({ Subsonic.logout(); SrcState.reset("sub") }) { Text("Отключить") }
                 }
                 TrackPane("sub", "Трек или исполнитель на сервере", "S", null, np, startPlay, Modifier.weight(1f)) { Subsonic.tracks(it) }
@@ -418,7 +418,7 @@ private fun TrackPane(key: String, hint: String, badge: String, suggest: ((Strin
     Column(modifier) {
         SearchBox(st.query, { st.query = it }, hint, badge, suggest, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp))
-        st.status?.let { Text(it, Modifier.padding(16.dp, 8.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+        st.status?.let { Text(it, Modifier.padding(16.dp, 8.dp), color = WP.error, style = MaterialTheme.typography.bodySmall) }
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(st.results, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(st.results, i) } }
             item { Spacer(Modifier.height(16.dp)) }
@@ -435,14 +435,14 @@ private fun SubsonicSetup(modifier: Modifier) {
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Свой сервер", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        Text("Свой сервер", color = WP.text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
         Text("Подключи Navidrome, Airsonic, Gonic или другой сервер с протоколом Subsonic, и вся твоя музыка с него будет здесь.",
-            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+            color = WP.text2, style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(u, { u = it; err = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Адрес сервера") }, placeholder = { Text("192.168.1.10:4533") })
         OutlinedTextField(l, { l = it; err = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Логин") })
         OutlinedTextField(p, { p = it; err = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Пароль") },
             visualTransformation = PasswordVisualTransformation())
-        err?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+        err?.let { Text(it, color = WP.error, style = MaterialTheme.typography.bodySmall) }
         Button({
             scope.launch {
                 busy = true; err = null
@@ -453,7 +453,7 @@ private fun SubsonicSetup(modifier: Modifier) {
                 busy = false
             }
         }, enabled = !busy && u.isNotBlank() && l.isNotBlank()) { Text(if (busy) "Проверяю…" else "Подключиться") }
-        Text("Логин и пароль хранятся только на этом телефоне.", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+        Text("Логин и пароль хранятся только на этом телефоне.", color = WP.text3, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -462,11 +462,11 @@ private fun LinkPane(startPlay: (List<Track>, Int) -> Unit, modifier: Modifier) 
     var url by remember { mutableStateOf("") }
     var err by remember { mutableStateOf<String?>(null) }
     Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Своя ссылка", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        Text("Своя ссылка", color = WP.text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
         Text("Прямая ссылка на аудиофайл (mp3, aac, ogg, flac) или на поток интернет-радио.",
-            color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium)
+            color = WP.text2, style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(url, { url = it; err = null }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("https://…") })
-        err?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
+        err?.let { Text(it, color = WP.error, style = MaterialTheme.typography.bodySmall) }
         Button({
             val u = url.trim()
             if (!(u.startsWith("http://") || u.startsWith("https://"))) err = "Ссылка должна начинаться с http:// или https://"
