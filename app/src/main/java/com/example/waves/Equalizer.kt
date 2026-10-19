@@ -82,7 +82,7 @@ object Eq {
 
     fun setLevel(band: Int, mB: Int) {
         if (band !in levels.indices) return
-        if (!enabled) setEnabled(true)
+        if (!enabled) enable(true)
         val v = mB.coerceIn(minLevel, maxLevel)
         levels[band] = v; preset = -1
         try { eq?.setBandLevel(band.toShort(), v.toShort()) } catch (_: Exception) { }
@@ -91,7 +91,7 @@ object Eq {
 
     fun usePreset(i: Int) {
         if (i !in presets.indices) return
-        if (!enabled) setEnabled(true)
+        if (!enabled) enable(true)
         try {
             eq?.usePreset(i.toShort())
             eq?.let { e -> for (b in levels.indices) levels[b] = e.getBandLevel(b.toShort()).toInt() }
@@ -128,7 +128,7 @@ fun EqualizerSheet(onDismiss: () -> Unit) {
         Column(Modifier.navigationBarsPadding().padding(horizontal = DS.padL).padding(bottom = DS.padL).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Эквалайзер", Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.titleLarge)
-                Switch(Eq.enabled, { Eq.setEnabled(it) }, enabled = Eq.available)
+                Switch(Eq.enabled, { Eq.enable(it) }, enabled = Eq.available)
             }
             if (!Eq.available) {
                 Text("Эквалайзер подключается к плееру: запустите любой трек. Если он не появился, устройство его не поддерживает.",
