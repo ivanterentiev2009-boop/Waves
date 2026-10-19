@@ -324,6 +324,14 @@ private fun RecognitionPage(onBack: () -> Unit) {
             Group("Движок") {
                 Pill(listOf("Vosk", "GigaAM"), Style.asrEngine, { Style.asrEngine = it; Style.save() })
             }
+            Group("Выделение голоса") {
+                Pill(listOf("Нет", "По центру", "Шумы", "Авто"), Style.prepMode, { Style.prepMode = it; Style.save() },
+                    Modifier.horizontalScroll(rememberScrollState()))
+                Hint("Убирает часть музыки перед распознаванием. Это упрощённый способ, не нейросеть, поэтому на разных песнях помогает по-разному.")
+                Hint("«По центру» оставляет то, что звучит в центре стерео (обычно голос), и убирает инструменты по бокам, бас и бит. " +
+                    "«Шумы» применяет шумоподавитель речи (скачает около 0,5 МБ). " +
+                    "«Авто» при синхронизации текста пробует все способы и берёт тот, где больше слов совпало: дольше в 2–3 раза.")
+            }
         }
         if (Style.subsEnabled && Style.asrEngine == 1) {
             Group("GigaAM") {

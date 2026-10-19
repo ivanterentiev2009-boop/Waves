@@ -47,7 +47,7 @@ object Style {
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
-    const val BUILD = "r36"
+    const val BUILD = "r37"
     var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
     var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var ovScale by mutableFloatStateOf(1f)     // редактор оверлея
@@ -67,6 +67,7 @@ object Style {
     var waveSub by mutableStateOf(false)
     var waveLikes by mutableStateOf(false)
     var asrEngine by mutableIntStateOf(1)      // 0 Vosk, 1 GigaAM
+    var prepMode by mutableIntStateOf(0)       // выделение голоса: 0 нет, 1 по центру, 2 шумоподавитель, 3 авто (при синхронизации)
     var subsEnabled by mutableStateOf(false)   // распознавание текста (Vosk)
     var blurBehind by mutableStateOf(false)   // эксперимент, по умолчанию выключено
 
@@ -76,12 +77,12 @@ object Style {
         theme = s.getInt("theme", 0); accent = s.getInt("accent", accent); glass = s.getFloat("glass", glass)
         corner = s.getInt("corner", corner); overlayAlpha = s.getFloat("oa", overlayAlpha); showViz = s.getBoolean("viz", true); refract = s.getFloat("refract", refract); blurBehind = s.getBoolean("bb", false); lightOverlay = s.getBoolean("lo", true)
         ovScale = s.getFloat("ovs", 1f); ovCover = s.getBoolean("ovc", true); ovEq = s.getBoolean("ove", true)
-        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1)
+        ovLyric = s.getBoolean("ovl", true); ovStart = s.getInt("ovst", 1); overlayRefract = s.getBoolean("ovr", false); subsEnabled = s.getBoolean("subs", false); asrEngine = s.getInt("asr", 1); prepMode = s.getInt("prep", 0).coerceIn(0, 3)
         lyYandex = s.getBoolean("lyy", true); lyLrclib = s.getBoolean("lyl", true); lyOvh = s.getBoolean("lyo", true); waveStyle = s.getInt("ws3", 0).coerceIn(0, 2); layout = s.getInt("lay", 1); waveYandex = s.getBoolean("wmy", true); waveSc = s.getBoolean("wms", false); waveLocal = s.getBoolean("wml", false); waveSub = s.getBoolean("wmu", false); waveLikes = s.getBoolean("wmk", false)
     }
     fun save() {
         sp?.edit()?.putInt("theme", theme)?.putInt("accent", accent)?.putFloat("glass", glass)
-            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)
+            ?.putInt("corner", corner)?.putFloat("oa", overlayAlpha)?.putBoolean("viz", showViz)?.putFloat("refract", refract)?.putBoolean("bb", blurBehind)?.putBoolean("ovr", overlayRefract)?.putBoolean("subs", subsEnabled)?.putInt("asr", asrEngine)?.putInt("prep", prepMode)
             ?.putBoolean("lyy", lyYandex)?.putBoolean("lyl", lyLrclib)?.putBoolean("lyo", lyOvh)?.putInt("ws3", waveStyle)?.putInt("lay", layout)?.putBoolean("wmy", waveYandex)?.putBoolean("wms", waveSc)?.putBoolean("wml", waveLocal)?.putBoolean("wmu", waveSub)?.putBoolean("wmk", waveLikes)?.apply()
     }
 }

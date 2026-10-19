@@ -31,7 +31,12 @@ object LyricAlign {
      * reference: строки правильного текста. asr: слова распознавания (слово, начало мс, конец мс).
      * Возвращает строки с временем или null, если совпало слишком мало и выравниванию нельзя верить.
      */
-    fun align(reference: List<LyricLine>, asr: List<Triple<String, Long, Long>>): List<LyricLine>? {
+    class Result(val lines: List<LyricLine>, val ratio: Float)
+
+    fun align(reference: List<LyricLine>, asr: List<Triple<String, Long, Long>>): List<LyricLine>? = alignScored(reference, asr)?.lines
+
+    /** То же, но с долей совпавших слов текста (от 0 до 1): по ней можно выбрать лучший из нескольких вариантов звука. */
+    fun alignScored(reference: List<LyricLine>, asr: List<Triple<String, Long, Long>>): Result? {
         // слова правильного текста с номерами строк; делим по пробелам, как делит экран текста
         val refWords = ArrayList<String>(); val refLine = ArrayList<Int>()
         reference.forEachIndexed { li, l -> l.text.split(" ").filter { it.isNotBlank() }.forEach { refWords.add(it); refLine.add(li) } }
@@ -104,7 +109,7 @@ object LyricAlign {
             out.add(LyricLine(times.first().first, refWords.subList(idx, idx + cnt).joinToString(" "), times))
             idx += cnt
         }
-        return out
+        return Result(out, matched.toFloat() / n)
     }
 
     /** Блокирующий вызов: прямая ссылка на звук трека для распознавания или null, если трек нельзя прочитать. */
