@@ -1,0 +1,248 @@
+package com.example.waves
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NorthWest
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
+/** Последние поисковые запросы, общие для всех источников. */
+object SearchHistory {
+    private var sp: SharedPreferences? = null
+    val items = mutableStateListOf<String>()
+
+    fun init(ctx: Context) {
+        if (sp != null) return
+        val s = ctx.applicationContext.getSharedPreferences("searchhist", 0); sp = s
+        items.addAll(s.getString("items", "").orEmpty().split("\n").filter { it.isNotBlank() })
+    }
+
+    fun remove(q: String) { items.remove(q); persist() }
+    fun clear() { items.clear(); persist() }
+    private fun persist() { sp?.edit()?.putString("items", items.joinToString("\n"))?.apply() }
+
+    fun add(q: String) {
+        val t = q.trim()
+        if (t.isEmpty()) return
+        items.removeAll { it.equals(t, ignoreCase = true) }
+        items.add(0, t)
+        while (items.size > 12) items.removeAt(items.lastIndex)
+        sp?.edit()?.putString("items", items.joinToString("\n"))?.apply()
+    }
+}
+
+/** Ряд «таблеток» с необязательным значком: фильтры результатов и переключатель источников. */
+@Composable
+fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(DS.padS)) {
+        items.forEachIndexed { i, (icon, label) ->
+            val on = i == selected
+            val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "cb")
+            val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "cf")
+            val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "cl")
+            Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { onSelect(i) }
+                .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) { Icon(icon, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }
+                Text(label, color = fg, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceBadge(text: String) {
+    Box(Modifier.padding(end = 6.dp).size(32.dp).clip(CircleShape).background(DS.fillColor), contentAlignment = Alignment.Center) {
+        Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * Поисковая строка: стеклянная «таблетка». По нажатию поверх экрана открывается панель с подсказками
+ * и полем ввода над клавиатурой. badge: короткая метка источника справа, suggest: подсказки (может быть null).
+ */
+@Composable
+fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badge: String,
+              suggest: ((String) -> List<String>)?, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
+    val ctx = LocalContext.current
+    remember { SearchHistory.init(ctx) }
+    Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp)) {
+        Row(Modifier.fillMaxSize().clickable {
+            SearchHost.req = SearchReq(value, hint, badge, suggest) { q -> SearchHistory.add(q); onValueChange(q); onSearch() }
+        }.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+            Spacer(Modifier.width(DS.padM))
+            Text(if (value.isBlank()) hint else value, Modifier.weight(1f),
+                color = if (value.isBlank()) Color.White.copy(DS.TEXT3) else Color.White,
+                style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (value.isNotBlank()) IconButton({ onValueChange("") }, Modifier.size(DS.btn)) { Icon(Icons.Default.Close, "Очистить", Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2)) }
+            else SourceBadge(badge)
+        }
+    }
+}
+
+/** Запрос на показ панели поиска: её рисует SearchOverlayHost поверх всего приложения. */
+class SearchReq(val initial: String, val hint: String, val badge: String, val suggest: ((String) -> List<String>)?, val onSubmit: (String) -> Unit)
+
+object SearchHost { var req by mutableStateOf<SearchReq?>(null) }
+
+/** Ставится один раз в корне приложения. Панель живёт в том же окне, поэтому клавиатура её поднимает. */
+@Composable
+fun SearchOverlayHost() {
+    val r = SearchHost.req ?: return
+    key(r) {
+        SearchOverlay(r.initial, r.hint, r.badge, r.suggest,
+            onSubmit = { q -> r.onSubmit(q); SearchHost.req = null },
+            onDismiss = { SearchHost.req = null })
+    }
+}
+
+@Composable
+private fun SearchOverlay(initial: String, hint: String, badge: String, suggest: ((String) -> List<String>)?,
+                          onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+    var sugg by remember { mutableStateOf<List<String>>(emptyList()) }
+    val focus = remember { FocusRequester() }
+    val accent = Color(Style.accent)
+    LaunchedEffect(Unit) { try { focus.requestFocus() } catch (_: IllegalStateException) { } }
+    LaunchedEffect(text.text) {
+        val q = text.text.trim()
+        if (q.isBlank() || suggest == null) { sugg = emptyList(); return@LaunchedEffect }
+        delay(250)
+        sugg = try { withContext(Dispatchers.IO) { suggest(q) } }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { emptyList() }
+    }
+    fun submit(q: String) { val t = q.trim(); if (t.isEmpty()) onDismiss() else onSubmit(t) }
+
+    val q = text.text.trim()
+    val fromHistory = q.isBlank() || sugg.isEmpty()
+    val list = when {
+        q.isBlank() -> SearchHistory.items.take(6)
+        sugg.isNotEmpty() -> sugg.take(6)
+        else -> SearchHistory.items.filter { it.contains(q, ignoreCase = true) && !it.equals(q, ignoreCase = true) }.take(6)
+    }
+    val shape = DS.shapeL
+    val noRipple = remember { MutableInteractionSource() }
+    BackHandler(onBack = onDismiss)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.55f)).clickable(interactionSource = noRipple, indication = null, onClick = onDismiss)) {
+            Column(Modifier.align(Alignment.BottomCenter).imePadding().navigationBarsPadding().padding(12.dp).fillMaxWidth()
+                .clip(shape).background(Color(0xF01E1E24)).border(DS.stroke, DS.lineColor, shape)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
+                if (q.isBlank() && SearchHistory.items.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Недавние", Modifier.weight(1f), color = Color.White.copy(0.6f), style = MaterialTheme.typography.labelLarge)
+                    TextButton({ SearchHistory.clear() }) { Text("Очистить", color = Color(Style.accent)) }
+                }
+                list.forEach { s ->
+                    Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+                        Spacer(Modifier.width(DS.padM))
+                        val starts = q.isNotEmpty() && s.startsWith(q, ignoreCase = true)
+                        Text(buildAnnotatedString {
+                            if (starts) {
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(s.take(q.length)) }
+                                withStyle(SpanStyle(color = Color.White.copy(0.65f))) { append(s.drop(q.length)) }
+                            } else withStyle(SpanStyle(color = Color.White)) { append(s) }
+                        }, Modifier.weight(1f).padding(vertical = 10.dp), style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconButton({ if (q.isBlank()) SearchHistory.remove(s) else { val n = s + " "; text = TextFieldValue(n, TextRange(n.length)) } }) {
+                            if (q.isBlank()) Icon(Icons.Default.Close, "Удалить из истории", tint = Color.White.copy(0.6f)) else Icon(Icons.Default.NorthWest, "Вставить в строку", tint = Color.White.copy(0.6f))
+                        }
+                    }
+                }
+                if (list.isNotEmpty()) HorizontalDivider(color = Color.White.copy(0.08f))
+                Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = accent)
+                    Spacer(Modifier.width(DS.padM))
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (text.text.isEmpty()) Text(hint, color = Color.White.copy(0.45f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        BasicTextField(text, { text = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
+                            textStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White),
+                            cursorBrush = SolidColor(accent),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { submit(text.text) }))
+                    }
+                    if (text.text.isNotEmpty()) IconButton({ text = TextFieldValue("") }) {
+                        Icon(Icons.Default.Close, "Очистить", tint = Color.White.copy(0.8f))
+                    }
+                    SourceBadge(badge)
+                }
+            }
+        }
+}
+
+/**
+ * Источники «Моей волны»: нажатием включаются и выключаются, можно несколько сразу. Хотя бы один всегда включён.
+ * Изменения применяются к следующей подборке («Стряхнуть волну» делает это сразу).
+ */
+@Composable
+fun WaveSourceChips(modifier: Modifier = Modifier) {
+    val chips = listOf("Яндекс" to Style.waveYandex, "SoundCloud" to Style.waveSc, "Файлы" to Style.waveLocal,
+        "Сервер" to Style.waveSub, "Нравится" to Style.waveLikes)
+    fun toggle(i: Int) {
+        val on = listOf(Style.waveYandex, Style.waveSc, Style.waveLocal, Style.waveSub, Style.waveLikes).toMutableList()
+        on[i] = !on[i]
+        if (on.none { it }) return
+        Style.waveYandex = on[0]; Style.waveSc = on[1]; Style.waveLocal = on[2]; Style.waveSub = on[3]; Style.waveLikes = on[4]
+        Style.save()
+    }
+    Column(modifier) {
+        Text("Откуда музыка в волне", color = Color.White.copy(0.7f), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            chips.forEachIndexed { i, (label, on) ->
+                val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "wsb")
+                val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "wsf")
+                val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "wsl")
+                Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { toggle(i) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (on) { Icon(Icons.Default.Check, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }
+                    Text(label, color = fg, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                }
+            }
+        }
+    }
+}
