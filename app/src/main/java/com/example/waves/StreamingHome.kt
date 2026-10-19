@@ -96,7 +96,7 @@ object Recent {
 internal fun ArtFill(uri: Uri?) {
     if (uri != null) AsyncImage(uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(Style.accent).copy(0.5f), Color(0xFFFF8AD8).copy(0.4f)))),
-        contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(48.dp), tint = Color.White) }
+        contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(DS.iconL), tint = Color.White) }
 }
 
 /** Какая вкладка нижней панели открыта (0 волна, 1 коллекция, 2 поиск). */
@@ -131,7 +131,7 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
                 recentOpen -> RecentScreen(np, startPlay) { recentOpen = false }
                 nav == 0 -> HomeTab(c, np, startPlay) { recentOpen = true }
                 nav == 1 -> CollectionTab(np, device, startPlay)
-                else -> SourcesTab(c, np, startPlay, Modifier.fillMaxSize().padding(bottom = 190.dp))
+                else -> SourcesTab(c, np, startPlay, Modifier.fillMaxSize().padding(bottom = DS.bottomReserve))
             }
         }
         Column(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) {
@@ -145,14 +145,14 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
 private fun NavBar(sel: Int, onSel: (Int) -> Unit) {
     val items = listOf(Icons.Default.GraphicEq to "Волна", Icons.Default.LibraryMusic to "Коллекция",
         Icons.Default.Search to "Поиск", Icons.Default.Tune to "Настройки")
-    Frosted(RoundedCornerShape(32.dp), Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-    Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Frosted(CircleShape, Modifier.fillMaxWidth().padding(horizontal = DS.padM, vertical = 4.dp)) {
+    Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         items.forEachIndexed { i, (icon, label) ->
             val on = i == sel
             val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "nb")
             val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "nf")
-            Box(Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(26.dp)).background(bg).clickable { onSel(i) },
-                contentAlignment = Alignment.Center) { Icon(icon, label, tint = fg) }
+            Box(Modifier.weight(1f).height(DS.navH).clip(CircleShape).background(bg).clickable { onSel(i) },
+                contentAlignment = Alignment.Center) { Icon(icon, label, Modifier.size(DS.iconM), tint = fg) }
         }
     }
     }
@@ -204,7 +204,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
         }
     }
     fun shake() = loadWave { Wave.station }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = DS.bottomReserve)) {
         item {
             WaveHero(np, heroArt, listOf(seedArt), np.playing && Wave.active, loading,
                 onToggle = { if (!Wave.active) startStation("wave") else if (np.playing) c?.pause() else c?.play() },
@@ -226,7 +226,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
         err?.let { item { Text(it, Modifier.padding(20.dp, 4.dp), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) } }
         item { RecentCard(onRecent) }
         if (Recent.list.isNotEmpty()) {
-            item { Text("Вы слушали", Modifier.padding(start = 20.dp, top = 22.dp, bottom = 10.dp),
+            item { Text("Вы слушали", Modifier.padding(start = DS.padL, top = 20.dp, bottom = DS.padM),
                 color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
             item {
                 val rl = Recent.list.take(15)
@@ -236,7 +236,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
             }
         }
         if (upcoming.isNotEmpty()) {
-            item { Text(if (YState.wave.isNotEmpty()) "Дальше в волне" else "Из понравившегося", Modifier.padding(start = 20.dp, top = 22.dp, bottom = 10.dp),
+            item { Text(if (YState.wave.isNotEmpty()) "Дальше в волне" else "Из понравившегося", Modifier.padding(start = DS.padL, top = 20.dp, bottom = DS.padM),
                 color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -254,21 +254,21 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
 
 @Composable
 private fun RecentCard(onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).panel(RoundedCornerShape(24.dp))
-        .clickable(onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Cover(Recent.list.firstOrNull()?.art, 56); Spacer(Modifier.width(14.dp))
+    Row(Modifier.fillMaxWidth().padding(horizontal = DS.padL, vertical = DS.padS).panel(DS.shapeM)
+        .clickable(onClick = onClick).padding(DS.padS), verticalAlignment = Alignment.CenterVertically) {
+        Cover(Recent.list.firstOrNull()?.art, DS.coverRow); Spacer(Modifier.width(DS.padM))
         Column(Modifier.weight(1f)) {
             Text("Недавние", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text("${Recent.list.size} треков", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
         }
-        Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
     }
 }
 
 @Composable
 private fun RecentScreen(np: NowPlaying, startPlay: (List<Track>, Int) -> Unit, onBack: () -> Unit) {
     val list = Recent.list.toList()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = DS.bottomReserve)) {
         item {
             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
@@ -289,15 +289,15 @@ private fun CollectionTab(np: NowPlaying, device: List<Track>, startPlay: (List<
             try { YState.likes = withContext(Dispatchers.IO) { YandexApi.likes() } } catch (_: Exception) { }
     }
     Column(Modifier.fillMaxSize()) {
-        Text("Коллекция", Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-        Pill(listOf("Мне нравится", "На устройстве", "Плейлисты"), part, { part = it; openPl = null }, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        Text("Коллекция", Modifier.padding(start = DS.padL, top = DS.padM, bottom = DS.padS), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Pill(listOf("Мне нравится", "На устройстве", "Плейлисты"), part, { part = it; openPl = null }, Modifier.padding(horizontal = DS.padL, vertical = 4.dp))
         if (part == 2) {
             val pl = openPl
             if (pl == null) PlaylistList(Modifier.weight(1f), { openPl = it }, { newOpen = true })
             else PlaylistDetail(pl, np, startPlay, Modifier.weight(1f)) { openPl = null }
         } else {
             val list = if (part == 0) Likes.all() else device
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = DS.padS, bottom = DS.bottomReserve)) {
                 if (list.isEmpty()) item {
                     Text(if (part == 0) "Здесь будут треки, которые ты отметил сердечком" else "На устройстве не найдено музыки",
                         Modifier.padding(24.dp), color = Color(0xB3FFFFFF))
@@ -311,24 +311,24 @@ private fun CollectionTab(np: NowPlaying, device: List<Track>, startPlay: (List<
 
 @Composable
 private fun PlaylistList(modifier: Modifier, onOpen: (Playlist) -> Unit, onNew: () -> Unit) {
-    LazyColumn(modifier, contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(top = DS.padS, bottom = DS.bottomReserve)) {
         item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(24.dp))
-                .clickable(onClick = onNew).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Add, null, tint = Color(Style.accent)); Spacer(Modifier.width(12.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = DS.padL, vertical = 4.dp).clip(DS.shapeM)
+                .clickable(onClick = onNew).padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Add, null, Modifier.size(DS.iconM), tint = Color(Style.accent)); Spacer(Modifier.width(DS.padM))
                 Text("Новый плейлист", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         if (Playlists.all.isEmpty()) item { Text("Плейлистов пока нет", Modifier.padding(24.dp), color = Color(0xB3FFFFFF)) }
         items(Playlists.all, key = { it.id }) { p ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(24.dp))
-                .clickable { onOpen(p) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Cover(p.tracks.firstOrNull()?.art, 56); Spacer(Modifier.width(14.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = DS.padL, vertical = 4.dp).clip(DS.shapeM)
+                .clickable { onOpen(p) }.padding(DS.padS), verticalAlignment = Alignment.CenterVertically) {
+                Cover(p.tracks.firstOrNull()?.art, DS.coverRow); Spacer(Modifier.width(DS.padM))
                 Column(Modifier.weight(1f)) {
                     Text(p.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${p.tracks.size} треков", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+                Icon(Icons.Default.ChevronRight, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
             }
         }
     }
@@ -348,7 +348,7 @@ private fun PlaylistDetail(pl: Playlist, np: NowPlaying, startPlay: (List<Track>
         if (pl.tracks.isNotEmpty()) Button({ startPlay(pl.tracks.toList(), 0) }, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Слушать")
         }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = DS.padS, bottom = DS.bottomReserve)) {
             if (pl.tracks.isEmpty()) item { Text("Пусто. Нажми и держи трек и выбери «Добавить в плейлист».", Modifier.padding(24.dp), color = Color(0xB3FFFFFF)) }
             itemsIndexed(pl.tracks, key = { _, t -> t.id }) { i, t ->
                 TrackRow(t, t.id == np.id, listOf("Удалить из плейлиста" to { Playlists.removeTrack(pl.id, t) })) { startPlay(pl.tracks.toList(), i) }

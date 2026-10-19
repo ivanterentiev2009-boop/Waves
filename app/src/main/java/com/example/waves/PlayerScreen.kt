@@ -64,10 +64,10 @@ private fun Modifier.fadeEdges(): Modifier = this
     }
 
 @Composable
-private fun RoundBtn(icon: ImageVector, size: Int = 52, onClick: () -> Unit) {
+private fun RoundBtn(icon: ImageVector, size: Int = 44, onClick: () -> Unit) {
     Frosted(CircleShape, Modifier.size(size.dp)) {
         Box(Modifier.fillMaxSize().clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Color.White)
+            Icon(icon, null, Modifier.size(DS.iconM), tint = Color.White)
         }
     }
 }
@@ -114,15 +114,15 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 RoundBtn(Icons.Default.KeyboardArrowDown) { onClose() }
                 Spacer(Modifier.weight(1f))
-                Frosted(RoundedCornerShape(50), Modifier.height(52.dp)) {
+                Frosted(CircleShape, Modifier.height(44.dp)) {
                     Row(Modifier.clickable { mode = if (mode == 2) 0 else 2 }.padding(horizontal = 16.dp).fillMaxHeight(),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.MusicNote, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
+                        Icon(Icons.Default.MusicNote, null, tint = Color.White.copy(DS.TEXT2), modifier = Modifier.size(DS.iconS))
+                        Spacer(Modifier.width(DS.padS))
                         Text("Очередь", color = Color.White, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.width(10.dp))
-                        Box(Modifier.size(28.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
-                            Text("${c?.mediaItemCount ?: 0}", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(DS.padS))
+                        Box(Modifier.size(24.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
+                            Text("${c?.mediaItemCount ?: 0}", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -159,7 +159,7 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
                     when (m) {
                         1 -> LyricsPane(c, np, lyr, pos) { editIndex = it }
                         2 -> QueuePane(c, np)
-                        else -> Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(40.dp)).background(Color(0x22FFFFFF))) {
+                        else -> Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(DS.shapeL).background(DS.fillColor)) {
                             if (np.art != null) AsyncImage(np.art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Icon(Icons.Default.MusicNote, null, Modifier.size(96.dp), tint = Color.White.copy(0.6f))
@@ -171,55 +171,55 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
 
             // бегущая строка с текстом песни под обложкой
             LyricTicker(lyr, pos, show = mode == 0, onClick = { mode = 1 })
-            Text(np.title ?: "", Modifier.fillMaxWidth(), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+            Text(np.title ?: "", Modifier.fillMaxWidth(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // имя артиста открывает его страницу
-            Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
-                Text(np.artist ?: "", Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onArtist).padding(horizontal = 14.dp, vertical = 4.dp),
-                    color = Color.White.copy(0.7f), fontSize = 20.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = DS.padS), contentAlignment = Alignment.Center) {
+                Text(np.artist ?: "", Modifier.clip(DS.shapeS).clickable(onClick = onArtist).padding(horizontal = DS.padM, vertical = 4.dp),
+                    color = Color.White.copy(DS.TEXT2), fontSize = 18.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
             SeekSection(c, np, pos)
 
             // панель управления
-            Frosted(RoundedCornerShape(36.dp), Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalArrangement = Arrangement.SpaceEvenly,
+            Frosted(DS.shapeL, Modifier.fillMaxWidth().padding(top = DS.padS)) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically) {
-                    IconButton({ c?.repeatMode = (np.repeat + 1) % 3 }) {
-                        Icon(if (np.repeat == 1) Icons.Default.RepeatOne else Icons.Default.Repeat, null,
-                            tint = if (np.repeat != 0) accent else Color.White.copy(0.7f))
+                    IconButton({ c?.repeatMode = (np.repeat + 1) % 3 }, Modifier.size(DS.btn)) {
+                        Icon(if (np.repeat == 1) Icons.Default.RepeatOne else Icons.Default.Repeat, null, Modifier.size(DS.iconM),
+                            tint = if (np.repeat != 0) accent else Color.White.copy(DS.TEXT2))
                     }
-                    IconButton({ c?.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(34.dp), tint = Color.White) }
-                    Box(Modifier.size(86.dp).clip(CircleShape).background(Color.White)
+                    IconButton({ c?.seekToPreviousMediaItem() }, Modifier.size(48.dp)) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(DS.iconL), tint = Color.White) }
+                    Box(Modifier.size(68.dp).clip(CircleShape).background(Color.White)
                         .clickable { if (np.playing) c?.pause() else c?.play() }, contentAlignment = Alignment.Center) {
-                        Icon(if (np.playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(46.dp), tint = Color.Black)
+                        Icon(if (np.playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(DS.iconL), tint = Color.Black)
                     }
-                    IconButton({ c?.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, Modifier.size(34.dp), tint = Color.White) }
-                    IconButton({ c?.shuffleModeEnabled = !np.shuffle }) {
-                        Icon(Icons.Default.Shuffle, null, tint = if (np.shuffle) accent else Color.White.copy(0.7f))
+                    IconButton({ c?.seekToNextMediaItem() }, Modifier.size(48.dp)) { Icon(Icons.Default.SkipNext, null, Modifier.size(DS.iconL), tint = Color.White) }
+                    IconButton({ c?.shuffleModeEnabled = !np.shuffle }, Modifier.size(DS.btn)) {
+                        Icon(Icons.Default.Shuffle, null, Modifier.size(DS.iconM), tint = if (np.shuffle) accent else Color.White.copy(DS.TEXT2))
                     }
                 }
             }
 
             // нижние капсулы
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Frosted(RoundedCornerShape(30.dp), Modifier.height(56.dp)) {
-                    Row(Modifier.padding(horizontal = 10.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton({
+            Row(Modifier.fillMaxWidth().padding(top = DS.padS, bottom = DS.padS), horizontalArrangement = Arrangement.SpaceBetween) {
+                Frosted(CircleShape, Modifier.height(DS.navH)) {
+                    Row(Modifier.padding(horizontal = 4.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = {
                             if (android.provider.Settings.canDrawOverlays(ctx)) ctx.startForegroundService(android.content.Intent(ctx, OverlayService::class.java))
                             else ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                 android.net.Uri.parse("package:${ctx.packageName}")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }) { Icon(Icons.Default.PictureInPicture, null, tint = Color.White) }
+                        }, modifier = Modifier.size(DS.btn)) { Icon(Icons.Default.PictureInPicture, null, Modifier.size(DS.iconM), tint = Color.White) }
                     }
                 }
-                Frosted(RoundedCornerShape(30.dp), Modifier.height(56.dp)) {
-                    Row(Modifier.padding(horizontal = 10.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton({ mode = if (mode == 1) 0 else 1 }, contentPadding = PaddingValues(horizontal = 12.dp)) {
-                            Text("T", color = if (mode == 1) accent else Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+                Frosted(CircleShape, Modifier.height(DS.navH)) {
+                    Row(Modifier.padding(horizontal = 4.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton({ mode = if (mode == 1) 0 else 1 }, contentPadding = PaddingValues(horizontal = 10.dp)) {
+                            Text("T", color = if (mode == 1) accent else Color.White, fontSize = 20.sp, fontWeight = FontWeight.Medium)
                         }
                         Box {
-                            IconButton({ speedMenu = true }) {
-                                Icon(Icons.Default.Speed, null, tint = if (speed != 1f) accent else Color.White)
+                            IconButton({ speedMenu = true }, Modifier.size(DS.btn)) {
+                                Icon(Icons.Default.Speed, null, Modifier.size(DS.iconM), tint = if (speed != 1f) accent else Color.White)
                             }
                             DropdownMenu(speedMenu, { speedMenu = false }) {
                                 listOf(0.75f, 1f, 1.25f, 1.5f, 2f).forEach { s ->
@@ -257,8 +257,8 @@ private fun QueuePane(c: MediaController?, np: NowPlaying) {
         items(n) { i ->
             val m = c!!.getMediaItemAt(i).mediaMetadata
             val sel = i == np.index
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                .background(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent)
+            Row(Modifier.fillMaxWidth().clip(DS.shapeM)
+                .background(if (sel) Color(Style.accent).copy(DS.SEL) else Color.Transparent)
                 .clickable { c.seekTo(i, 0); c.play() }.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Cover(m.artworkUri, 48); Spacer(Modifier.width(12.dp))
                 Column {
@@ -293,9 +293,9 @@ private fun NextPill(c: MediaController?, np: NowPlaying) {
     val nextIdx = np.index + 1
     if (c == null || nextIdx >= n) return
     val m = c.getMediaItemAt(nextIdx).mediaMetadata
-    Frosted(RoundedCornerShape(50), Modifier.height(42.dp)) {
+    Frosted(CircleShape, Modifier.height(36.dp)) {
         Row(Modifier.clickable { c.seekToNextMediaItem() }.padding(horizontal = 8.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-            Cover(m.artworkUri, 28); Spacer(Modifier.width(8.dp))
+            Cover(m.artworkUri, 24); Spacer(Modifier.width(DS.padS))
             Text("Далее: ${m.title ?: ""}", Modifier.widthIn(max = 170.dp), color = Color.White, style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

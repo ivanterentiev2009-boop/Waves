@@ -58,7 +58,7 @@ private fun themeName(id: Int) = THEME_NAMES[THEME_IDS.indexOf(id).coerceAtLeast
 /** Группа настроек: стеклянная карточка с заголовком, как «Недавние» на главной. */
 @Composable
 private fun Group(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(Style.corner.dp), refract = true).padding(16.dp),
+    Column(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true).padding(DS.padL),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (title != null) Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         content()
@@ -85,10 +85,10 @@ private fun Hint(text: String) {
 /** Строка раздела на главной странице настроек: значок, название, краткое текущее значение. */
 @Composable
 private fun NavRow(icon: ImageVector, title: String, summary: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().panel(RoundedCornerShape(Style.corner.dp), refract = true)
-        .clickable(onClick = onClick).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(46.dp).clip(CircleShape).background(Color(Style.accent)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Color.Black)
+    Row(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true)
+        .clickable(onClick = onClick).padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(Color(Style.accent)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(DS.iconM), tint = Color.Black)
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -103,7 +103,7 @@ private fun NavRow(icon: ImageVector, title: String, summary: String, onClick: (
 
 @Composable
 private fun SwitchRow(label: String, value: Boolean, hint: String? = null, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { onChange(!value) }.padding(vertical = 2.dp),
+    Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { onChange(!value) }.padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, color = Color.White)
@@ -136,11 +136,11 @@ private fun ThemeTile(id: Int, modifier: Modifier) {
         1 -> SolidColor(Color(0xFF17171C))
         else -> SolidColor(Color.Black)
     }
-    val border by animateColorAsState(if (sel) accent else Color.White.copy(0.12f), tween(250), label = "tb")
-    val shape = RoundedCornerShape(20.dp)
-    Column(modifier.clip(shape).border(if (sel) 2.dp else 1.dp, border, shape)
+    val border by animateColorAsState(if (sel) accent else Color.White.copy(DS.LINE), tween(250), label = "tb")
+    val shape = DS.shapeM
+    Column(modifier.clip(shape).border(if (sel) DS.strokeSel else DS.stroke, border, shape)
         .clickable { Style.theme = id; Style.save() }.padding(6.dp)) {
-        Box(Modifier.fillMaxWidth().height(58.dp).clip(RoundedCornerShape(14.dp)).background(preview)) {
+        Box(Modifier.fillMaxWidth().height(58.dp).clip(DS.shapeS).background(preview)) {
             // «панелька» внутри миниатюры показывает, как выглядят карточки в теме
             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).fillMaxWidth(0.62f).height(14.dp)
                 .clip(CircleShape).background(Color.White.copy(if (id == 0) 0.28f else 0.12f)))
@@ -181,6 +181,7 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     remember { SoundCloud.init(ctx) }
     val lyricSources = listOf(Style.lyYandex, Style.lyLrclib, Style.lyOvh).count { it }
+    var advancedOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = Color.White) }
@@ -194,9 +195,22 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
             NavRow(Icons.Default.LibraryMusic, "Музыкальные сервисы",
                 "Яндекс: " + (if (YandexApi.token.isNotBlank()) "вход выполнен" else "не выполнен") +
                     ", SoundCloud: " + (if (SoundCloud.hasKey) "ключ есть" else "нет ключа")) { open(5) }
-            NavRow(Icons.Default.Subtitles, "Тексты песен", "Включено источников: $lyricSources из 3") { open(3) }
-            NavRow(Icons.Default.Mic, "Распознавание текста",
-                if (!Style.subsEnabled) "Выключено" else if (Style.asrEngine == 1) "GigaAM" else "Vosk") { open(4) }
+            NavRow(Icons.Default.Subtitles, "Тексты песен", "Автоматический поиск и синхронизация") { open(3) }
+            Row(Modifier.fillMaxWidth().panel(DS.shapeM, refract = true).clickable { advancedOpen = !advancedOpen }.padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(0.10f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Mic, null, Modifier.size(DS.iconM), tint = Color.White)
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Дополнительные настройки", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("Распознавание, модели и тонкая настройка", color = dimText, style = MaterialTheme.typography.bodySmall)
+                }
+                Icon(if (advancedOpen) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+            }
+            if (advancedOpen) {
+                NavRow(Icons.Default.Mic, "Распознавание текста",
+                    if (!Style.subsEnabled) "Выключено" else if (Style.asrEngine == 1) "GigaAM" else "Vosk") { open(4) }
+            }
         }
         Text("Waves " + (try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName } catch (_: Exception) { "" }) + ", сборка ${Style.BUILD}",
             Modifier.fillMaxWidth().padding(24.dp), color = faintText, style = MaterialTheme.typography.bodySmall)
@@ -220,20 +234,30 @@ private fun LookPage(onBack: () -> Unit) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf(0xFFB69CFF, 0xFF7CC4FF, 0xFF6EE7B7, 0xFFFF8AD8, 0xFFFFB86B, 0xFFFFFFFF).forEach { l ->
                     val c = l.toInt()
-                    Box(Modifier.size(42.dp).clip(CircleShape).background(Color(c))
-                        .border(if (Style.accent == c) 3.dp else 0.dp, Color.White.copy(0.9f), CircleShape)
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(Color(c))
+                        .border(if (Style.accent == c) DS.strokeSel else 0.dp, Color.White.copy(0.9f), CircleShape)
                         .clickable { Style.accent = c; Style.save() }, contentAlignment = Alignment.Center) {
-                        if (Style.accent == c) Icon(Icons.Default.Check, null, tint = Color.Black)
+                        if (Style.accent == c) Icon(Icons.Default.Check, null, Modifier.size(DS.iconM), tint = Color.Black)
                     }
                 }
             }
         }
-        Group("Стекло и формы") {
-            SliderRow("Прозрачность стекла", "${(Style.glass / 0.30f * 100).toInt()}%", Style.glass, 0.04f..0.30f) { Style.glass = it }
-            if (glassCapable) SliderRow("Сила преломления", "×" + "%.1f".format(Style.refract), Style.refract, 0.4f..2.5f) { Style.refract = it }
-            SliderRow("Скругление углов", "${Style.corner} dp", Style.corner.toFloat(), 8f..36f) { Style.corner = it.toInt() }
+        var fineTune by remember { mutableStateOf(false) }
+        Group {
+            Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { fineTune = !fineTune }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Тонкая настройка", color = Color.White, fontWeight = FontWeight.Medium)
+                    Hint("Прозрачность, преломление и скругление")
+                }
+                Icon(if (fineTune) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+            }
+            if (fineTune) {
+                SliderRow("Прозрачность стекла", "${(Style.glass / 0.30f * 100).toInt()}%", Style.glass, 0.04f..0.30f) { Style.glass = it }
+                if (glassCapable) SliderRow("Сила преломления", "×" + "%.1f".format(Style.refract), Style.refract, 0.4f..2.5f) { Style.refract = it }
+                SliderRow("Скругление углов", "${Style.corner} dp", Style.corner.toFloat(), 8f..36f) { Style.corner = it.toInt() }
+            }
         }
-        Group("Эквалайзер") {
+        Group("Визуализация") {
             SwitchRow("Показывать визуализацию", Style.showViz, "В плеере, оверлее и на «Моей волне»") { Style.showViz = it; Style.save() }
         }
     }
@@ -254,9 +278,9 @@ private fun WavePage(onBack: () -> Unit) {
         Group {
             WAVE_STYLES.forEachIndexed { i, (name, desc) ->
                 val sel = Style.waveStyle == i
-                val bg by animateColorAsState(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(250), label = "wb")
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape((Style.corner * 0.7f).dp)).background(bg)
-                    .clickable { Style.waveStyle = i; Style.save() }.padding(horizontal = 12.dp, vertical = 10.dp),
+                val bg by animateColorAsState(if (sel) Color(Style.accent).copy(DS.SEL) else Color.Transparent, tween(250), label = "wb")
+                Row(Modifier.fillMaxWidth().clip(DS.shapeM).background(bg)
+                    .clickable { Style.waveStyle = i; Style.save() }.padding(horizontal = DS.padM, vertical = DS.padS),
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(name, color = Color.White, fontWeight = FontWeight.Medium)
@@ -274,24 +298,35 @@ private fun OverlayPage(onBack: () -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val blurOk = android.os.Build.VERSION.SDK_INT >= 31 && ctx.getSystemService(android.view.WindowManager::class.java).isCrossWindowBlurEnabled
     Page("Оверлей", onBack) {
-        Hint("Изменения видны сразу, если оверлей включён.")
+        var advancedOverlay by remember { mutableStateOf(false) }
+        Hint("Управляй музыкой поверх других приложений. Изменения применяются сразу.")
         Group("Вид") {
             Text("Вид при запуске", color = Color.White)
             Pill(listOf("Пузырёк", "Компактный", "Полный"), Style.ovStart, { Style.ovStart = it; Style.save() })
-            SliderRow("Размер", "${(Style.ovScale * 100).toInt()}%", Style.ovScale, 0.7f..1.4f) { Style.ovScale = it }
-            SliderRow("Плотность", "${(Style.overlayAlpha * 100).toInt()}%", Style.overlayAlpha, 0.3f..1f) { Style.overlayAlpha = it }
         }
         Group("Что показывать") {
             SwitchRow("Обложка", Style.ovCover) { Style.ovCover = it; Style.save() }
             SwitchRow("Эквалайзер", Style.ovEq) { Style.ovEq = it; Style.save() }
             SwitchRow("Строка текста", Style.ovLyric, "В компактном виде") { Style.ovLyric = it; Style.save() }
         }
-        Group("Эксперимент: размытие под оверлеем") {
-            Text(if (blurOk) "Размытие окон на устройстве доступно" else "На этом устройстве размытие окон отключено или не поддерживается",
-                color = if (blurOk) Color(0xFF6EE7B7) else errText, style = MaterialTheme.typography.bodySmall)
-            SwitchRow("Системное размытие фона", Style.blurBehind, "Android 12+. Углы размытия могут быть квадратными.") { Style.blurBehind = it; Style.save() }
+        Group {
+            Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { advancedOverlay = !advancedOverlay }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Дополнительные параметры", color = Color.White, fontWeight = FontWeight.Medium)
+                    Hint("Размер, прозрачность и системное размытие")
+                }
+                Icon(if (advancedOverlay) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+            }
+            if (advancedOverlay) {
+                SliderRow("Размер", "${(Style.ovScale * 100).toInt()}%", Style.ovScale, 0.7f..1.4f) { Style.ovScale = it }
+                SliderRow("Плотность", "${(Style.overlayAlpha * 100).toInt()}%", Style.overlayAlpha, 0.3f..1f) { Style.overlayAlpha = it }
+                HorizontalDivider(color = Color.White.copy(0.10f))
+                Text(if (blurOk) "Размытие окон на устройстве доступно" else "На этом устройстве размытие окон отключено или не поддерживается",
+                    color = if (blurOk) Color(0xFF6EE7B7) else errText, style = MaterialTheme.typography.bodySmall)
+                SwitchRow("Системное размытие фона", Style.blurBehind, "Android 12+. Углы размытия могут быть квадратными.") { Style.blurBehind = it; Style.save() }
+            }
         }
-        TextButton({ Style.ovScale = 1f; Style.ovCover = true; Style.ovEq = true; Style.ovLyric = true; Style.ovStart = 1; Style.save() },
+        TextButton({ Style.ovScale = 1f; Style.overlayAlpha = 0.9f; Style.ovCover = true; Style.ovEq = true; Style.ovLyric = true; Style.ovStart = 1; Style.save() },
             Modifier.align(Alignment.CenterHorizontally)) { Text("Сбросить оверлей") }
     }
 }
@@ -400,6 +435,7 @@ private fun ServicesPage(onBack: () -> Unit) {
     var yLogin by remember { mutableStateOf(false) }
     var scWeb by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf("") }
+    var showScAdvanced by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
     var ok by remember { mutableStateOf(true) }
@@ -435,21 +471,30 @@ private fun ServicesPage(onBack: () -> Unit) {
                     busy = false
                 }
             }, enabled = !busy) { Text(if (busy) "Ищу…" else "Получить автоматически") }
-            HorizontalDivider(color = Color.White.copy(0.10f))
-            Text("Способ 2. Через сайт", color = Color.White, fontWeight = FontWeight.Medium)
-            Hint("Откроется soundcloud.com. Дождись загрузки страницы, ключ поймается сам, нажимать ничего не нужно.")
-            Button({ scWeb = true }) { Text("Открыть soundcloud.com") }
-            HorizontalDivider(color = Color.White.copy(0.10f))
-            Text("Способ 3. Вставить вручную", color = Color.White, fontWeight = FontWeight.Medium)
-            Hint("Вставь ключ из 32 символов или любую ссылку из браузера, где есть client_id=.")
-            OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Ключ или ссылка") })
-            Button({
-                val k = SoundCloud.parseKey(manual)
-                if (k == null) { msg = "Не нашёл ключ в этом тексте"; ok = false }
-                else { SoundCloud.setKey(k, "вручную"); msg = "Ключ сохранён"; ok = true; manual = "" }
-            }, enabled = manual.isNotBlank()) { Text("Сохранить ключ") }
+            Row(Modifier.fillMaxWidth().clip(DS.shapeS).clickable { showScAdvanced = !showScAdvanced }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Другие способы подключения", color = Color.White, fontWeight = FontWeight.Medium)
+                    Hint("Через сайт или вручную — если автоматический способ не сработал")
+                }
+                Icon(if (showScAdvanced) Icons.Default.Close else Icons.Default.ChevronRight, null, tint = Color.White.copy(0.7f))
+            }
+            if (showScAdvanced) {
+                HorizontalDivider(color = Color.White.copy(0.10f))
+                Text("Через сайт", color = Color.White, fontWeight = FontWeight.Medium)
+                Hint("Откроется soundcloud.com. Дождись загрузки страницы, ключ поймается автоматически.")
+                Button({ scWeb = true }) { Text("Открыть soundcloud.com") }
+                HorizontalDivider(color = Color.White.copy(0.10f))
+                Text("Вставить вручную", color = Color.White, fontWeight = FontWeight.Medium)
+                Hint("Для тех, у кого уже есть ключ или ссылка с client_id=.")
+                OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Ключ или ссылка") })
+                Button({
+                    val k = SoundCloud.parseKey(manual)
+                    if (k == null) { msg = "Не нашёл ключ в этом тексте"; ok = false }
+                    else { SoundCloud.setKey(k, "вручную"); msg = "Ключ сохранён"; ok = true; manual = "" }
+                }, enabled = manual.isNotBlank()) { Text("Сохранить ключ") }
+            }
             msg?.let { Text(it, color = if (ok) green else errText, style = MaterialTheme.typography.bodySmall) }
-            if (SoundCloud.hasKey) TextButton({ SoundCloud.reset(); msg = "Ключ удалён"; ok = true }) { Text("Удалить ключ") }
+            if (SoundCloud.hasKey) TextButton({ SoundCloud.reset(); msg = "Ключ удалён"; ok = true }) { Text("Удалить подключение") }
         }
     }
 }

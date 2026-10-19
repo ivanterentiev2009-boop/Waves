@@ -43,11 +43,11 @@ object Style {
     var theme by mutableIntStateOf(0)            // 0 стекло, 1 минимализм, 2 AMOLED
     var accent by mutableIntStateOf(0xFFB69CFF.toInt())
     var glass by mutableFloatStateOf(0.14f)
-    var corner by mutableIntStateOf(24)
+    var corner by mutableIntStateOf(20)
     var overlayAlpha by mutableFloatStateOf(0.9f)
     var showViz by mutableStateOf(true)
     var refract by mutableFloatStateOf(1.3f)
-    const val BUILD = "r40"
+    const val BUILD = "r41"
     var overlayRefract by mutableStateOf(false)   // шейдер в оверлее: красивее, но тяжелее
     var lightOverlay by mutableStateOf(true)   // облегчённый оверлей: без шейдера, быстрее
     var ovScale by mutableFloatStateOf(1f)     // редактор оверлея
@@ -159,19 +159,19 @@ fun Modifier.panel(shape: Shape, strength: Float = 1f, refract: Boolean = false)
         DisposableEffect(id) { onDispose { GlassRects.map.remove(id) } }
         Modifier.onGloballyPositioned { GlassRects.map[id] = it.boundsInRoot() }
             .clip(shape)
-            .border(1.2.dp, Brush.linearGradient(listOf(Color.White.copy(0.75f), Color.White.copy(0.05f), Color.White.copy(0.4f))), shape)
+            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.45f), Color.White.copy(0.05f), Color.White.copy(0.25f))), shape)
     } else when (Style.theme) {
         0 -> this.clip(shape)
-            .background(Color.Black.copy(alpha = 0.5f * strength))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(Style.glass + 0.10f), Color.White.copy(Style.glass * 0.4f))))
-            .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(0.55f), Color.White.copy(0.04f), Color.White.copy(0.25f))), shape)
+            .background(Color.Black.copy(alpha = 0.34f * strength))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(Style.glass + 0.06f), Color.White.copy(Style.glass * 0.4f))))
+            .border(DS.stroke, Brush.linearGradient(listOf(Color.White.copy(0.30f), Color.White.copy(DS.LINE * 0.5f), Color.White.copy(0.18f))), shape)
         1 -> this.clip(shape).background(Color(0xFF17171C).copy(alpha = strength))
-            .border(1.dp, Color.White.copy(0.07f), shape)
+            .border(DS.stroke, DS.lineColor, shape)
         3 -> this.clip(shape)          // матовое стекло: ровная приглушённая панель, без бликов и градиентов
             .background(Color(0xFF1B1B22).copy(alpha = ((0.50f + Style.glass * 0.6f).coerceAtMost(0.9f)) * strength))
-            .border(1.dp, Color.White.copy(0.06f), shape)
+            .border(DS.stroke, DS.lineColor, shape)
         else -> this.clip(shape).background(Color.Black.copy(alpha = strength))
-            .border(1.dp, Color.White.copy(0.10f), shape)
+            .border(DS.stroke, DS.lineColor, shape)
     }
 
 @Composable
@@ -187,17 +187,13 @@ fun AppBackground(art: Uri?, content: @Composable BoxScope.() -> Unit) {
             val layer = if (glassCapable) Modifier.fillMaxSize().liquidLayer() else Modifier.fillMaxSize()
             Box(layer) {
                 val a = Color(Style.accent)
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(a.copy(0.55f), Color.Transparent), Offset(250f, 350f), 1100f)))
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.30f), Color.Transparent), Offset(900f, 1500f), 900f)))
-                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.28f), Color.Transparent), Offset(100f, 2000f), 900f)))
-                if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 5.dp else 70.dp).alpha(if (glassCapable) 0.85f else 0.5f), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(a.copy(0.30f), Color.Transparent), Offset(250f, 350f), 1500f)))
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFFFF8AD8).copy(0.12f), Color.Transparent), Offset(900f, 1500f), 1300f)))
+                Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF5CC8FF).copy(0.10f), Color.Transparent), Offset(100f, 2000f), 1300f)))
+                if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(if (glassCapable) 3.dp else 28.dp).alpha(if (glassCapable) 0.75f else 0.38f), contentScale = ContentScale.Crop)
             }
         } else if (Style.theme == 3) {
-            MatteBackdrop(art, 16.dp, Modifier.fillMaxSize())
-            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                val rnd = kotlin.random.Random(3)
-                repeat(500) { drawCircle(Color.White.copy(0.03f), 1.dp.toPx(), Offset(rnd.nextFloat() * size.width, rnd.nextFloat() * size.height)) }
-            }
+            MatteBackdrop(art, 8.dp, Modifier.fillMaxSize())
         }
       }
         content()
@@ -250,12 +246,12 @@ fun OverlaySurface(shape: Shape, strength: Float, modifier: Modifier, art: Uri?,
 /** Фон матового стекла: мягкий градиент и размытая обложка. */
 @Composable
 fun MatteBackdrop(art: Uri?, artBlur: androidx.compose.ui.unit.Dp, modifier: Modifier) {
-    val tint = lerp(Color(Style.accent), Color.Black, 0.65f)
+    val tint = lerp(Color(Style.accent), Color.Black, 0.55f)
     Box(modifier) {
         Box(Modifier.fillMaxSize().background(Color(0xFF111116)))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint.copy(0.55f), Color(0xFF111116), tint.copy(0.30f)))))
-        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.45f), contentScale = ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.25f)))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint.copy(0.35f), Color(0xFF111116), tint.copy(0.20f)))))
+        if (art != null) AsyncImage(art, null, Modifier.fillMaxSize().blur(artBlur).alpha(0.35f), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.10f)))
     }
 }
 
@@ -272,9 +268,9 @@ fun Frosted(shape: Shape, modifier: Modifier = Modifier, refract: Boolean = fals
     Box(modifier.clip(shape)
         .hazeEffect(haze) {
             backgroundColor = Color(0xFF1B1B22)
-            blurRadius = 28.dp
-            tints = listOf(HazeTint(Color.White.copy(0.08f + Style.glass * 0.20f)))
-            noiseFactor = 0.04f
+            blurRadius = 16.dp
+            tints = listOf(HazeTint(Color.White.copy(0.06f + Style.glass * 0.16f)))
+            noiseFactor = 0.02f
         }
-        .border(1.dp, Color.White.copy(0.10f), shape), content = content)
+        .border(DS.stroke, DS.lineColor, shape), content = content)
 }

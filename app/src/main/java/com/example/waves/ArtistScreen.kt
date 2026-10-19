@@ -44,7 +44,7 @@ fun Avatar(uri: Uri?, size: Int) {
 
 @Composable
 fun ArtistChip(a: ArtistItem, onClick: () -> Unit) {
-    Column(Modifier.width(96.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(4.dp),
+    Column(Modifier.width(96.dp).clip(DS.shapeM).clickable(onClick = onClick).padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Avatar(a.cover, 80)
         Text(a.name, Modifier.padding(top = 6.dp), color = Color.White, style = MaterialTheme.typography.bodySmall,
@@ -54,7 +54,7 @@ fun ArtistChip(a: ArtistItem, onClick: () -> Unit) {
 
 @Composable
 private fun AlbumCard(al: AlbumItem, onClick: () -> Unit) {
-    Column(Modifier.width(140.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)) {
+    Column(Modifier.width(140.dp).clip(DS.shapeM).clickable(onClick = onClick)) {
         Cover(al.cover, 140)
         Text(al.title, Modifier.padding(top = 8.dp), color = Color.White, fontWeight = FontWeight.Medium,
             style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -77,7 +77,7 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
         LazyColumn(Modifier.fillMaxSize()) {
             item {
                 Box(Modifier.fillMaxWidth()) {
-                    AsyncImage(p?.artist?.cover, null, Modifier.matchParentSize().blur(40.dp).alpha(0.45f), contentScale = ContentScale.Crop)
+                    AsyncImage(p?.artist?.cover, null, Modifier.matchParentSize().blur(24.dp).alpha(0.30f), contentScale = ContentScale.Crop)
                     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         Avatar(p?.artist?.cover, 140)
@@ -135,9 +135,9 @@ fun ArtistScreen(cur: String, onBack: () -> Unit, onPlay: (List<Track>, Int) -> 
 /** Исполнитель в списке результатов: аватар, имя, подпись. */
 @Composable
 fun ArtistRow(a: ArtistItem, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape((Style.corner * 0.7f).dp))
-        .clickable(onClick = onClick).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(a.cover, 64); Spacer(Modifier.width(16.dp))
+    Row(Modifier.fillMaxWidth().padding(horizontal = DS.padM).clip(DS.shapeM)
+        .clickable(onClick = onClick).padding(DS.padS), verticalAlignment = Alignment.CenterVertically) {
+        Avatar(a.cover, 56); Spacer(Modifier.width(DS.padM))
         Column(Modifier.weight(1f)) {
             Text(a.name, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (a.sub.isNotBlank()) Text(a.sub, color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

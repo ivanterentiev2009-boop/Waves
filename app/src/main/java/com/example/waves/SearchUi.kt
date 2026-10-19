@@ -79,15 +79,15 @@ object SearchHistory {
 /** Ряд «таблеток» с необязательным значком: фильтры результатов и переключатель источников. */
 @Composable
 fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(DS.padS)) {
         items.forEachIndexed { i, (icon, label) ->
             val on = i == selected
             val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "cb")
             val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "cf")
-            val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(0.18f), tween(250), label = "cl")
-            Row(Modifier.clip(CircleShape).background(bg).border(1.dp, line, CircleShape).clickable { onSelect(i) }
-                .padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) { Icon(icon, null, Modifier.size(20.dp), tint = fg); Spacer(Modifier.width(8.dp)) }
+            val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "cl")
+            Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { onSelect(i) }
+                .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) { Icon(icon, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }
                 Text(label, color = fg, style = MaterialTheme.typography.titleSmall, maxLines = 1)
             }
         }
@@ -96,8 +96,8 @@ fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (I
 
 @Composable
 private fun SourceBadge(text: String) {
-    Box(Modifier.padding(end = 8.dp).size(38.dp).clip(CircleShape).background(Color.White.copy(0.10f)), contentAlignment = Alignment.Center) {
-        Text(text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Box(Modifier.padding(end = 6.dp).size(32.dp).clip(CircleShape).background(DS.fillColor), contentAlignment = Alignment.Center) {
+        Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -110,16 +110,16 @@ fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badg
               suggest: ((String) -> List<String>)?, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
     val ctx = LocalContext.current
     remember { SearchHistory.init(ctx) }
-    Frosted(CircleShape, modifier.fillMaxWidth().height(56.dp)) {
+    Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp)) {
         Row(Modifier.fillMaxSize().clickable {
             SearchHost.req = SearchReq(value, hint, badge, suggest) { q -> SearchHistory.add(q); onValueChange(q); onSearch() }
-        }.padding(start = 18.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, null, tint = Color.White.copy(0.7f))
-            Spacer(Modifier.width(12.dp))
+        }.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+            Spacer(Modifier.width(DS.padM))
             Text(if (value.isBlank()) hint else value, Modifier.weight(1f),
-                color = if (value.isBlank()) Color.White.copy(0.5f) else Color.White,
+                color = if (value.isBlank()) Color.White.copy(DS.TEXT3) else Color.White,
                 style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (value.isNotBlank()) IconButton({ onValueChange("") }) { Icon(Icons.Default.Close, "Очистить", tint = Color.White.copy(0.8f)) }
+            if (value.isNotBlank()) IconButton({ onValueChange("") }, Modifier.size(DS.btn)) { Icon(Icons.Default.Close, "Очистить", Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2)) }
             else SourceBadge(badge)
         }
     }
@@ -166,28 +166,28 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
         sugg.isNotEmpty() -> sugg.take(6)
         else -> SearchHistory.items.filter { it.contains(q, ignoreCase = true) && !it.equals(q, ignoreCase = true) }.take(6)
     }
-    val shape = RoundedCornerShape(32.dp)
+    val shape = DS.shapeL
     val noRipple = remember { MutableInteractionSource() }
     BackHandler(onBack = onDismiss)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(0.55f)).clickable(interactionSource = noRipple, indication = null, onClick = onDismiss)) {
             Column(Modifier.align(Alignment.BottomCenter).imePadding().navigationBarsPadding().padding(12.dp).fillMaxWidth()
-                .clip(shape).background(Color(0xF01E1E24)).border(1.dp, Color.White.copy(0.10f), shape)
+                .clip(shape).background(Color(0xF01E1E24)).border(DS.stroke, DS.lineColor, shape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
                 if (q.isBlank() && SearchHistory.items.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Недавние", Modifier.weight(1f), color = Color.White.copy(0.6f), style = MaterialTheme.typography.labelLarge)
                     TextButton({ SearchHistory.clear() }) { Text("Очистить", color = Color(Style.accent)) }
                 }
                 list.forEach { s ->
-                    Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, tint = Color.White.copy(0.75f))
-                        Spacer(Modifier.width(18.dp))
+                    Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (fromHistory) Icons.Default.History else Icons.Default.Search, null, Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2))
+                        Spacer(Modifier.width(DS.padM))
                         val starts = q.isNotEmpty() && s.startsWith(q, ignoreCase = true)
                         Text(buildAnnotatedString {
                             if (starts) {
                                 withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(s.take(q.length)) }
                                 withStyle(SpanStyle(color = Color.White.copy(0.65f))) { append(s.drop(q.length)) }
                             } else withStyle(SpanStyle(color = Color.White)) { append(s) }
-                        }, Modifier.weight(1f).padding(vertical = 14.dp), style = MaterialTheme.typography.titleMedium,
+                        }, Modifier.weight(1f).padding(vertical = 10.dp), style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         IconButton({ if (q.isBlank()) SearchHistory.remove(s) else { val n = s + " "; text = TextFieldValue(n, TextRange(n.length)) } }) {
                             if (q.isBlank()) Icon(Icons.Default.Close, "Удалить из истории", tint = Color.White.copy(0.6f)) else Icon(Icons.Default.NorthWest, "Вставить в строку", tint = Color.White.copy(0.6f))
@@ -195,9 +195,9 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                     }
                 }
                 if (list.isNotEmpty()) HorizontalDivider(color = Color.White.copy(0.08f))
-                Row(Modifier.fillMaxWidth().height(64.dp).padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Search, null, tint = accent)
-                    Spacer(Modifier.width(18.dp))
+                Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = accent)
+                    Spacer(Modifier.width(DS.padM))
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (text.text.isEmpty()) Text(hint, color = Color.White.copy(0.45f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         BasicTextField(text, { text = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
@@ -236,10 +236,10 @@ fun WaveSourceChips(modifier: Modifier = Modifier) {
             chips.forEachIndexed { i, (label, on) ->
                 val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "wsb")
                 val fg by animateColorAsState(if (on) Color.Black else Color.White, tween(250), label = "wsf")
-                val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(0.18f), tween(250), label = "wsl")
-                Row(Modifier.clip(CircleShape).background(bg).border(1.dp, line, CircleShape).clickable { toggle(i) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (on) { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = fg); Spacer(Modifier.width(6.dp)) }
+                val line by animateColorAsState(if (on) Color.Transparent else Color.White.copy(DS.LINE), tween(250), label = "wsl")
+                Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { toggle(i) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (on) { Icon(Icons.Default.Check, null, Modifier.size(DS.iconS), tint = fg); Spacer(Modifier.width(6.dp)) }
                     Text(label, color = fg, style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 }
             }

@@ -46,38 +46,38 @@ private val dim = Color(0xB3FFFFFF)
 
 @Composable
 fun Cover(art: android.net.Uri?, size: Int) {
-    Box(Modifier.size(size.dp).clip(RoundedCornerShape((Style.corner * 0.55f).dp)).background(Color(0x22FFFFFF))) {
+    Box(Modifier.size(size.dp).clip(DS.shapeS).background(DS.fillColor)) {
         AsyncImage(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        if (art == null) Icon(Icons.Default.MusicNote, null, Modifier.align(Alignment.Center), tint = Color.White)
+        if (art == null) Icon(Icons.Default.MusicNote, null, Modifier.align(Alignment.Center).size(DS.iconM), tint = Color.White)
     }
 }
 
 @Composable
 fun Controls(c: MediaController?, playing: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton({ c?.seekToPreviousMediaItem() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White) }
-        FilledIconButton({ if (playing) c?.pause() else c?.play() }, Modifier.size(48.dp)) {
-            Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+        IconButton({ c?.seekToPreviousMediaItem() }, Modifier.size(DS.btn)) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(DS.iconM), tint = Color.White) }
+        FilledIconButton({ if (playing) c?.pause() else c?.play() }, Modifier.size(DS.btn)) {
+            Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(DS.iconM))
         }
-        IconButton({ c?.seekToNextMediaItem() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White) }
+        IconButton({ c?.seekToNextMediaItem() }, Modifier.size(DS.btn)) { Icon(Icons.Default.SkipNext, null, Modifier.size(DS.iconM), tint = Color.White) }
     }
 }
 
 @Composable
 fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
     val pos = rememberPosition(c, np.playing, 100)
-    Frosted(RoundedCornerShape(Style.corner.dp), Modifier.fillMaxWidth().padding(12.dp), refract = true) {
-    Column(Modifier.clickable(onClick = onOpen).padding(10.dp)) {
+    Frosted(DS.shapeM, Modifier.fillMaxWidth().padding(horizontal = DS.padM, vertical = 4.dp), refract = true) {
+    Column(Modifier.clickable(onClick = onOpen).padding(start = 6.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Cover(np.art, 52); Spacer(Modifier.width(12.dp))
+            Cover(np.art, DS.miniCover); Spacer(Modifier.width(DS.padS))
             Column(Modifier.weight(1f)) {
-                Text(np.title ?: "Ничего не играет", color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(np.artist ?: "", color = dim, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                Text(np.title ?: "Ничего не играет", color = Color.White, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(np.artist ?: "", color = dim, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Controls(c, np.playing)
         }
         // прогресс рисуется в фазе отрисовки: без перекомпоновки интерфейса
-        Box(Modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp, end = 4.dp).height(3.dp)
+        Box(Modifier.fillMaxWidth().padding(top = 4.dp, start = 2.dp, end = 8.dp).height(2.dp)
             .clip(CircleShape).background(Color.White.copy(0.15f)).drawBehind {
                 val d = (c?.duration ?: 0L).coerceAtLeast(0L)
                 val f = if (d > 0) (pos.value.toFloat() / d).coerceIn(0f, 1f) else 0f
@@ -89,11 +89,11 @@ fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
 
 @Composable
 fun Pill(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.clip(CircleShape).background(Color.White.copy(0.08f)).border(1.dp, Color.White.copy(0.12f), CircleShape).padding(3.dp)) {
+    Row(modifier.clip(CircleShape).background(DS.fillColor).border(DS.stroke, DS.lineColor, CircleShape).padding(3.dp)) {
         options.forEachIndexed { i, t ->
             val bg by animateColorAsState(if (i == selected) Color(Style.accent) else Color.Transparent, tween(250), label = "pb")
             val fg by animateColorAsState(if (i == selected) Color.Black else Color.White, tween(250), label = "pf")
-            Box(Modifier.clip(CircleShape).background(bg).clickable { onSelect(i) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Box(Modifier.clip(CircleShape).background(bg).clickable { onSelect(i) }.padding(horizontal = 14.dp, vertical = 6.dp)) {
                 Text(t, color = fg, style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -103,19 +103,19 @@ fun Pill(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier
 @Composable
 fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifier: Modifier = Modifier,
               currentId: String? = null, footer: (@Composable () -> Unit)? = null) {
-    LazyColumn(modifier, contentPadding = PaddingValues(12.dp, 4.dp, 12.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(DS.padM, 4.dp, DS.padM, DS.padM), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         itemsIndexed(tracks, key = { _, t -> t.id }) { i, t ->
             val sel = if (currentId != null) t.id == currentId else i == current
             val bg by animateColorAsState(if (sel) Color(Style.accent).copy(0.22f) else Color.Transparent, tween(300), label = "rb")
-            Row(Modifier.animateItem().fillMaxWidth().clip(RoundedCornerShape((Style.corner * 0.7f).dp))
-                .background(bg).clickable { onClick(i) }.padding(horizontal = 8.dp, vertical = 10.dp),
+            Row(Modifier.animateItem().fillMaxWidth().clip(DS.shapeM)
+                .background(bg).clickable { onClick(i) }.padding(horizontal = DS.padS, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Cover(t.art, 50); Spacer(Modifier.width(14.dp))
+                Cover(t.art, DS.coverRow); Spacer(Modifier.width(DS.padM))
                 Column(Modifier.weight(1f)) {
                     Text(t.title, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(t.artist, color = dim, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (sel) Icon(Icons.Default.GraphicEq, null, tint = Color(Style.accent))
+                if (sel) Icon(Icons.Default.GraphicEq, null, Modifier.size(DS.iconM), tint = Color(Style.accent))
             }
         }
         footer?.let { f -> item { f() } }
@@ -193,7 +193,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
     val ls = rememberLazyListState()
     LaunchedEffect(active, tab, full) { if (full && tab == 1 && active >= 0) ls.animateScrollToItem(active, -70) }
 
-    OverlaySurface(RoundedCornerShape(Style.corner.dp), Style.overlayAlpha, Modifier.width(w).popIn(full), np.art) {
+    OverlaySurface(DS.shapeM, Style.overlayAlpha, Modifier.width(w).popIn(full), np.art) {
         Column(Modifier.padding(10.dp)) {
             Row(Modifier.fillMaxWidth().onGloballyPositioned {
                 val b = it.boundsInRoot()
@@ -227,7 +227,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
                             items(c.mediaItemCount) { i ->
                                 val sel by animateColorAsState(if (i == np.index) Color(Style.accent).copy(0.25f) else Color.Transparent, label = "q")
                                 Text(c.getMediaItemAt(i).mediaMetadata.title?.toString() ?: "", Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp)).background(sel)
+                                    .clip(DS.shapeS).background(sel)
                                     .clickable { c.seekTo(i, 0); c.play() }.padding(10.dp),
                                     color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
@@ -256,12 +256,12 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, hint: String, mo
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val accent = Color(Style.accent)
     val ring by animateColorAsState(if (focused) accent else Color.Transparent, tween(250), label = "sfr")
-    val icon by animateColorAsState(if (focused) accent else Color.White.copy(0.7f), tween(250), label = "sfi")
-    Frosted(CircleShape, modifier.fillMaxWidth().height(56.dp)) {
-        Row(Modifier.fillMaxSize().border(2.dp, ring, CircleShape).padding(start = 18.dp, end = 6.dp),
+    val icon by animateColorAsState(if (focused) accent else Color.White.copy(DS.TEXT2), tween(250), label = "sfi")
+    Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp)) {
+        Row(Modifier.fillMaxSize().border(DS.strokeSel, ring, CircleShape).padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Search, null, tint = icon)
-            Spacer(Modifier.width(12.dp))
+            Icon(Icons.Default.Search, null, Modifier.size(DS.iconM), tint = icon)
+            Spacer(Modifier.width(DS.padM))
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (value.isEmpty()) Text(hint, color = Color.White.copy(0.5f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                 androidx.compose.foundation.text.BasicTextField(value, onValueChange, Modifier.fillMaxWidth(), singleLine = true,
@@ -272,7 +272,7 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, hint: String, mo
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSearch(); focus.clearFocus() }))
             }
             androidx.compose.animation.AnimatedVisibility(value.isNotEmpty()) {
-                IconButton({ onValueChange("") }) { Icon(Icons.Default.Close, "Очистить", tint = Color.White.copy(0.8f)) }
+                IconButton({ onValueChange("") }) { Icon(Icons.Default.Close, "Очистить", Modifier.size(DS.iconM), tint = Color.White.copy(DS.TEXT2)) }
             }
         }
     }

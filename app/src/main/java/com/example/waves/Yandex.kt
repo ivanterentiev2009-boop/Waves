@@ -157,7 +157,7 @@ fun YandexTab(c: MediaController?, np: NowPlaying, onPlay: (List<Track>, Int) ->
 
     Column(modifier) {
         if (YandexApi.token.isBlank()) {
-            Column(Modifier.padding(16.dp).fillMaxWidth().panel(RoundedCornerShape(Style.corner.dp), refract = true).padding(16.dp),
+            Column(Modifier.padding(16.dp).fillMaxWidth().panel(DS.shapeM, refract = true).padding(DS.padL),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Вход в Яндекс Музыку", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text("Нажми «Войти через Яндекс», войди в аккаунт и разреши доступ: токен подхватится сам. Если не получилось, вставь адрес страницы или токен вручную ниже.",
