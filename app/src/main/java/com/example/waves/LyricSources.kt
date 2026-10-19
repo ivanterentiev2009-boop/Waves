@@ -41,14 +41,40 @@ object LyricSources {
         return null
     }
 
+    /** Хост -> до какого времени (мс) не стучимся, если сервис недавно лежал (503 и т.п.). */
+    private val coolUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     private fun get(url: String): String? {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 12000; c.readTimeout = 15000
-        c.setRequestProperty("User-Agent", "Waves/0.10 (personal music player)")
-        val code = c.responseCode
-        if (code == 404) return null
-        if (code !in 200..299) throw IOException("HTTP $code")
-        return c.inputStream.bufferedReader().readText()
+        val host = URL(url).host
+        if (System.currentTimeMillis() < (coolUntil[host] ?: 0L)) throw IOException("сервис временно недоступен")
+        var last: IOException? = null
+        for (attempt in 0 until 3) {
+            if (attempt > 0) {
+                try { Thread.sleep(if (attempt == 1) 700L else 1800L) } catch (_: InterruptedException) { break }
+            }
+            var c: HttpURLConnection? = null
+            try {
+                c = URL(url).openConnection() as HttpURLConnection
+                c.connectTimeout = 10000; c.readTimeout = 15000
+                c.setRequestProperty("User-Agent", "Waves/0.10 (personal music player)")
+                val code = c.responseCode
+                if (code == 404) { coolUntil.remove(host); return null }
+                if (code in 200..299) {
+                    val body = c.inputStream.bufferedReader().readText()
+                    coolUntil.remove(host)
+                    return body
+                }
+                if (code == 429 || code >= 500) { last = IOException("HTTP $code"); continue }   // временная ошибка — повторяем
+                throw IOException("HTTP $code")   // остальные коды повторять бессмысленно
+            } catch (e: java.net.SocketTimeoutException) { last = IOException("таймаут")
+            } catch (e: java.net.UnknownHostException) { last = IOException("нет сети"); break
+            } catch (e: IOException) {
+                if (e.message?.startsWith("HTTP") == true) throw e
+                last = e
+            } finally { c?.disconnect() }
+        }
+        coolUntil[host] = System.currentTimeMillis() + 3 * 60_000L   // не долбим лежащий сервер 3 минуты
+        throw last ?: IOException("сбой запроса")
     }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")

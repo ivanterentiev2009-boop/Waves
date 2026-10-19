@@ -16,6 +16,9 @@ import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
+import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 import org.vosk.Model
@@ -29,10 +32,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.ByteOrder
 import java.util.zip.ZipInputStream
-import com.k2fsa.sherpa.onnx.OfflineSpeechDenoiserModelConfig
-import com.k2fsa.sherpa.onnx.OfflineSpeechDenoiserGtcrnModelConfig
-import com.k2fsa.sherpa.onnx.OfflineSpeechDenoiserConfig
-import com.k2fsa.sherpa.onnx.OfflineSpeechDenoiser
 
 data class VoskModel(val name: String, val lang: String, val langText: String, val sizeText: String,
                      val type: String, val url: String, val obsolete: Boolean)
@@ -291,10 +290,93 @@ object Transcriber {
     private fun transcribeGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> = group(wordsGiga(ctx, uri, onProgress))
 
     private fun wordsGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> =
-        gigaOnSamples(ctx, decodeMono(ctx, uri) { onProgress(it * 0.25f) }) { onProgress(0.25f + 0.75f * it) }
+        decodeMono(ctx, uri) { onProgress(it * 0.25f) }.let { smp ->
+            val rg = speechRanges(ctx, smp) { onProgress(0.25f + 0.05f * it) }
+            gigaOnSamples(ctx, smp, rg) { onProgress(0.3f + 0.7f * it) }
+        }
 
-    /** Распознавание отсчётов 16 кГц моно. */
-    private fun gigaOnSamples(ctx: Context, samples: FloatArray, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> {
+    // ---------------- VAD (Silero): где в треке есть голос ----------------
+    private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+    private fun vadFile(ctx: Context) = File(ctx.filesDir, "silero_vad.onnx")
+
+    /** Скачивает маленькую модель VAD (~2 МБ). Любая ошибка не страшна: тогда трек режется по-старому. */
+    private suspend fun ensureVad(ctx: Context) {
+        val f = vadFile(ctx)
+        if (f.isFile && f.length() > 100_000) return
+        try { fetchFile(VAD_URL, f) { } } catch (_: Throwable) { f.delete() }
+    }
+
+    /**
+     * Куски трека с голосом (в отсчётах): Silero находит пение, соседние куски склеиваются (пауза до 1 с, итого до 25 с),
+     * по краям запас 0,25 с. Возвращает null, если модели нет, она сломалась или голос не найден (тогда работает старая нарезка).
+     */
+    private fun speechRanges(ctx: Context, samples: FloatArray, onProgress: (Float) -> Unit): List<IntArray>? {
+        val f = vadFile(ctx)
+        if (!(f.isFile && f.length() > 100_000)) return null
+        return try {
+            val sr = 16000
+            val vad = Vad(config = VadModelConfig(
+                sileroVadModelConfig = SileroVadModelConfig(model = f.path, threshold = 0.45f, minSilenceDuration = 0.4f,
+                    minSpeechDuration = 0.2f, windowSize = 512, maxSpeechDuration = 20f),
+                sampleRate = sr, numThreads = 1, provider = "cpu", debug = false))
+            val raw = mutableListOf<IntArray>()
+            fun drain() { while (!vad.empty()) { val seg = vad.front(); raw += intArrayOf(seg.start, seg.start + seg.samples.size); vad.pop() } }
+            try {
+                var i = 0; val step = 512 * 8
+                while (i < samples.size) {
+                    val e = minOf(i + step, samples.size)
+                    vad.acceptWaveform(samples.copyOfRange(i, e))
+                    drain(); i = e; onProgress(i.toFloat() / samples.size)
+                }
+                vad.flush(); drain()
+            } finally { vad.release() }
+            if (raw.isEmpty()) return null
+            val pad = sr / 4; val gap = sr; val maxLen = 25 * sr
+            val out = mutableListOf<IntArray>()
+            for (r in raw.sortedBy { it[0] }) {
+                val st = maxOf(0, r[0] - pad); val en = minOf(samples.size, r[1] + pad)
+                val last = out.lastOrNull()
+                if (last != null && st - last[1] <= gap && en - last[0] <= maxLen) last[1] = maxOf(last[1], en)
+                else if (last != null && st < last[1]) out += intArrayOf(last[1], maxOf(en, last[1] + 1))
+                else out += intArrayOf(st, en)
+            }
+            out
+        } catch (_: Throwable) { null }
+    }
+
+    /** Старая нарезка без VAD: куски по ~25 с в самых тихих местах. */
+    private fun plainRanges(samples: FloatArray): List<IntArray> {
+        val sr = 16000; val target = 25 * sr; val frame = sr / 10
+        val out = mutableListOf<IntArray>()
+        var start = 0
+        while (start < samples.size) {
+            var end = minOf(start + target, samples.size)
+            if (samples.size - start > target + 5 * sr) {
+                var best = end; var bestE = Float.MAX_VALUE
+                var p = start + 20 * sr
+                val hi = minOf(start + 28 * sr, samples.size)
+                while (p + frame <= hi) {
+                    var e = 0f
+                    for (k in p until p + frame) e += abs(samples[k])
+                    if (e < bestE) { bestE = e; best = p + frame / 2 }
+                    p += frame / 2
+                }
+                end = best
+            }
+            out += intArrayOf(start, end); start = end
+        }
+        return out
+    }
+
+    /** Заменяет тишину между кусками с голосом нулями (время не сдвигается), чтобы Vosk не слушал инструментал. */
+    private fun maskNonVoice(samples: FloatArray, ranges: List<IntArray>): FloatArray {
+        val out = FloatArray(samples.size)
+        for (r in ranges) System.arraycopy(samples, r[0], out, r[0], r[1] - r[0])
+        return out
+    }
+
+    /** Распознавание отсчётов 16 кГц моно; ranges — куски для распознавания (по умолчанию старая нарезка). */
+    private fun gigaOnSamples(ctx: Context, samples: FloatArray, ranges: List<IntArray>? = null, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> {
         val dir = gigaDir(ctx)
         val cfg = OfflineRecognizerConfig(
             modelConfig = OfflineModelConfig(
@@ -305,33 +387,29 @@ object Transcriber {
                 tokens = File(dir, "tokens.txt").path,
                 numThreads = 4,
                 modelType = "nemo_transducer"))
-        val sr = 16000; val target = 25 * sr; val frame = sr / 10
+        val sr = 16000; val maxLen = 25 * sr
+        // кусок длиннее 25 с (на всякий случай) делим на части
+        val parts = (ranges ?: plainRanges(samples)).flatMap { r ->
+            var a = r[0]; val l = mutableListOf<IntArray>()
+            while (r[1] - a > maxLen) { l += intArrayOf(a, a + maxLen); a += maxLen }
+            if (r[1] > a) l += intArrayOf(a, r[1]); l
+        }
+        val total = parts.sumOf { it[1] - it[0] }.coerceAtLeast(1)
         val rec = OfflineRecognizer(config = cfg)
         val words = mutableListOf<Triple<String, Long, Long>>()
         try {
-            var start = 0
-            while (start < samples.size) {
-                var end = minOf(start + target, samples.size)
-                if (samples.size - start > target + 5 * sr) {
-                    var best = end; var bestE = Float.MAX_VALUE
-                    var p = start + 20 * sr
-                    val hi = minOf(start + 28 * sr, samples.size)
-                    while (p + frame <= hi) {
-                        var e = 0f
-                        for (k in p until p + frame) e += abs(samples[k])
-                        if (e < bestE) { bestE = e; best = p + frame / 2 }
-                        p += frame / 2
-                    }
-                    end = best
+            var done = 0
+            for (r in parts) {
+                if (r[1] - r[0] > sr / 5) {
+                    val stream = rec.createStream()
+                    stream.acceptWaveform(samples.copyOfRange(r[0], r[1]), sr)
+                    rec.decode(stream)
+                    val res = rec.getResult(stream)
+                    stream.release()
+                    words += wordsFrom(res.tokens, res.timestamps, res.text, r[0] / sr.toFloat())
                 }
-                val stream = rec.createStream()
-                stream.acceptWaveform(samples.copyOfRange(start, end), sr)
-                rec.decode(stream)
-                val r = rec.getResult(stream)
-                stream.release()
-                words += wordsFrom(r.tokens, r.timestamps, r.text, start / sr.toFloat())
-                start = end
-                onProgress(start.toFloat() / samples.size)
+                done += r[1] - r[0]
+                onProgress(done.toFloat() / total)
             }
         } finally { rec.release() }
         return words
@@ -404,11 +482,8 @@ object Transcriber {
         errors.remove(id); progress[id] = 0f
         scope.launch {
             try {
-                val lines = if (Style.prepMode == 1 || Style.prepMode == 2) {
-                    val stereo = decodeStereo(app, uri) { progress[id] = it * 0.10f }
-                    val samples = prepared(app, stereo, Style.prepMode) { progress[id] = 0.10f + 0.10f * it }
-                    group(wordsOn(app, samples) { progress[id] = 0.20f + 0.80f * it })
-                } else if (giga) transcribeGiga(app, uri) { progress[id] = it } else transcribe(app, uri) { progress[id] = it }
+                ensureVad(app)
+                val lines = if (giga) transcribeGiga(app, uri) { progress[id] = it } else transcribe(app, uri) { progress[id] = it }
                 if (lines.isEmpty()) throw IOException("речь не найдена")
                 save(app, id, lines)
                 version++
@@ -428,21 +503,12 @@ object Transcriber {
         errors.remove(id); progress[id] = 0f
         scope.launch {
             try {
+                ensureVad(app)
                 val audio = LyricAlign.resolveAudio(id, uri) ?: throw IOException("этот трек нельзя прочитать для синхронизации")
-                val stereo = decodeStereo(app, audio) { progress[id] = it * 0.10f }
-                // «авто»: пробуем все способы подготовки звука и берём тот, где больше слов совпало с текстом
-                val variants = when (Style.prepMode) { 1 -> listOf(1); 2 -> listOf(2); 3 -> listOf(0, 1, 2); else -> listOf(0) }
-                var best: LyricAlign.Result? = null
-                variants.forEachIndexed { n, v ->
-                    if (best != null && best!!.ratio >= 0.85f) return@forEachIndexed   // уже достаточно хорошо
-                    val base = 0.10f + 0.90f * n / variants.size; val span = 0.90f / variants.size
-                    val samples = prepared(app, stereo, v) { progress[id] = base + span * 0.2f * it }
-                    val words = wordsOn(app, samples) { progress[id] = base + span * (0.2f + 0.8f * it) }
-                    if (words.isEmpty()) return@forEachIndexed
-                    val res = LyricAlign.alignScored(reference, words)
-                    if (res != null && (best == null || res.ratio > best!!.ratio)) best = res
-                }
-                val aligned = best?.lines ?: throw IOException("распознанное слишком отличается от текста: возможно, это другая версия песни")
+                val samples = decodeMono(app, audio) { progress[id] = it * 0.2f }
+                val words = wordsOn(app, samples) { progress[id] = 0.2f + 0.8f * it }
+                if (words.isEmpty()) throw IOException("голос не распознан")
+                val aligned = LyricAlign.align(reference, words) ?: throw IOException("распознанное слишком отличается от текста: возможно, это другая версия песни")
                 save(app, id, aligned)
                 version++
             } catch (e: Exception) { errors[id] = e.message ?: "неизвестная ошибка" }
@@ -501,54 +567,17 @@ object Transcriber {
     }
 
     /** Распознавание отсчётов выбранным движком. */
-    private fun wordsOn(ctx: Context, samples: FloatArray, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> =
-        if (Style.asrEngine == 1) gigaOnSamples(ctx, samples, onProgress) else voskOnSamples(ctx, samples, onProgress)
+    private fun wordsOn(ctx: Context, samples: FloatArray, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> {
+        val rg = speechRanges(ctx, samples) { onProgress(0.05f * it) }
+        return if (Style.asrEngine == 1) gigaOnSamples(ctx, samples, rg) { onProgress(0.05f + 0.95f * it) }
+        else voskOnSamples(ctx, if (rg != null) maskNonVoice(samples, rg) else samples) { onProgress(0.05f + 0.95f * it) }
+    }
 
     private fun decodeMono(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): FloatArray {
         val pcm = ByteArrayOutputStream()
         decode(ctx, uri, { b, n -> pcm.write(b, 0, n) }, onProgress)
         val bytes = pcm.toByteArray()
         return FloatArray(bytes.size / 2) { i -> ((bytes[2 * i + 1].toInt() shl 8) or (bytes[2 * i].toInt() and 0xFF)).toShort() / 32768f }
-    }
-
-    private fun decodeStereo(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): Pair<FloatArray, FloatArray> {
-        val pcm = ByteArrayOutputStream()
-        decodeCore(ctx, uri, true, { b, n -> pcm.write(b, 0, n) }, onProgress)
-        val bytes = pcm.toByteArray()
-        fun s(i: Int) = ((bytes[2 * i + 1].toInt() shl 8) or (bytes[2 * i].toInt() and 0xFF)).toShort() / 32768f
-        return FloatArray(bytes.size / 4) { s(2 * it) } to FloatArray(bytes.size / 4) { s(2 * it + 1) }
-    }
-
-    // ----- выделение голоса: шумоподавитель речи (GTCRN из sherpa-onnx) -----
-    private const val DENOISE_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx"
-
-    private suspend fun ensureDenoise(ctx: Context): File {
-        val f = File(File(ctx.filesDir, "denoise").apply { mkdirs() }, "gtcrn_simple.onnx")
-        if (!(f.isFile && f.length() > 100_000)) fetchFile(DENOISE_URL, f) { }
-        return f
-    }
-
-    private fun denoise(model: File, samples: FloatArray): FloatArray {
-        val den = OfflineSpeechDenoiser(config = OfflineSpeechDenoiserConfig(model = OfflineSpeechDenoiserModelConfig(
-            gtcrn = OfflineSpeechDenoiserGtcrnModelConfig(model = model.path), numThreads = 4)))
-        try {
-            val r = den.run(samples, 16000)
-            if (r.sampleRate != 16000) throw IOException("шумоподавитель вернул частоту ${r.sampleRate}")
-            return r.samples
-        } finally { den.release() }
-    }
-
-    /** Звук под выбранный вариант: 0 как есть, 1 голос по центру, 2 шумоподавитель. */
-    private suspend fun prepared(ctx: Context, st: Pair<FloatArray, FloatArray>, variant: Int, onProgress: (Float) -> Unit): FloatArray {
-        val (l, r) = st
-        return when (variant) {
-            1 -> VocalPrep.normalize(VocalPrep.centerVocal(l, r, onProgress))
-            2 -> {
-                val mono = FloatArray(minOf(l.size, r.size)) { (l[it] + r[it]) / 2f }
-                VocalPrep.normalize(denoise(ensureDenoise(ctx), mono))
-            }
-            else -> FloatArray(minOf(l.size, r.size)) { (l[it] + r[it]) / 2f }
-        }
     }
 
     /** Слова -> строки: до 8 слов, пауза больше 1.5 с или длина больше 6 с начинают новую строку. */
