@@ -284,7 +284,9 @@ object Transcriber {
     }
 
     /** GigaAM: трек режется на куски по ~25 с в самых тихих местах, чтобы не резать слова и не раздувать память. */
-    private fun transcribeGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> {
+    private fun transcribeGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> = group(wordsGiga(ctx, uri, onProgress))
+
+    private fun wordsGiga(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> {
         val dir = gigaDir(ctx)
         val cfg = OfflineRecognizerConfig(
             modelConfig = OfflineModelConfig(
@@ -328,7 +330,7 @@ object Transcriber {
                 onProgress(0.25f + 0.75f * start / samples.size)
             }
         } finally { rec.release() }
-        return group(words)
+        return words
     }
 
     private fun file(ctx: Context, id: String) = File(File(ctx.filesDir, "subs").apply { mkdirs() }, "$id.json")
@@ -407,7 +409,31 @@ object Transcriber {
         }
     }
 
-    private fun transcribe(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> {
+    /**
+     * Выравнивает готовый текст по голосу трека (см. LyricAlign). Результат сохраняется как свой текст трека,
+     * поэтому дальше показывается вместо исходного. Нужна скачанная модель распознавания.
+     */
+    fun startAlign(ctx: Context, id: String, uri: Uri, reference: List<LyricLine>) {
+        val giga = Style.asrEngine == 1
+        if (progress.containsKey(id) || !(if (giga) gigaReady else modelReady)) return
+        val app = ctx.applicationContext
+        errors.remove(id); progress[id] = 0f
+        scope.launch {
+            try {
+                val audio = LyricAlign.resolveAudio(id, uri) ?: throw IOException("этот трек нельзя прочитать для синхронизации")
+                val words = if (giga) wordsGiga(app, audio) { progress[id] = it * 0.9f } else wordsVosk(app, audio) { progress[id] = it * 0.9f }
+                if (words.isEmpty()) throw IOException("голос не распознан")
+                val aligned = LyricAlign.align(reference, words) ?: throw IOException("распознанное слишком отличается от текста: возможно, это другая версия песни")
+                save(app, id, aligned)
+                version++
+            } catch (e: Exception) { errors[id] = e.message ?: "неизвестная ошибка" }
+            progress.remove(id)
+        }
+    }
+
+    private fun transcribe(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<LyricLine> = group(wordsVosk(ctx, uri, onProgress))
+
+    private fun wordsVosk(ctx: Context, uri: Uri, onProgress: (Float) -> Unit): List<Triple<String, Long, Long>> {
         val model = Model(modelDir(ctx).absolutePath)
         try {
             val rec = Recognizer(model, 16000f).apply { setWords(true) }
@@ -422,7 +448,7 @@ object Transcriber {
             decode(ctx, uri, { buf, n -> if (rec.acceptWaveForm(buf, n)) parse(rec.result) }, onProgress)
             parse(rec.finalResult)
             rec.close()
-            return group(words)
+            return words
         } finally { model.close() }
     }
 

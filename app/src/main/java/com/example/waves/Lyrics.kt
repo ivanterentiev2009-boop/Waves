@@ -256,6 +256,7 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
                 if (lyr.lines.isEmpty()) EmptyLyrics(lyr.status, np)
                 else LazyColumn(Modifier.fillMaxSize(), state = listState,
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 160.dp)) {
+                    if (!synced && Style.subsEnabled) item { SyncBanner(np, lyr.lines) }
                     itemsIndexed(lyr.lines) { i, l -> LyricRow(l, i, active, synced, true, pos, lyr.lines.getOrNull(i + 1)?.timeMs, { editIndex = i }) { c?.seekTo(l.timeMs!!) } }
                 }
             }
@@ -367,5 +368,27 @@ fun LyricTicker(lyr: LyricsData, pos: State<Long>, show: Boolean, onClick: () ->
                     textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
             }
         }
+    }
+}
+
+/** Предложение синхронизировать текст без таймкодов с голосом: слова получают точное время. */
+@Composable
+fun SyncBanner(np: NowPlaying, lines: List<LyricLine>) {
+    val ctx = LocalContext.current
+    val id = np.id ?: return
+    LaunchedEffect(Unit) { Transcriber.refresh(ctx) }
+    val p = Transcriber.progress[id]
+    val ready = if (Style.asrEngine == 1) Transcriber.gigaReady else Transcriber.modelReady
+    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("У этого текста нет времени строк", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+        when {
+            p != null -> {
+                LinearProgressIndicator({ p }, Modifier.fillMaxWidth())
+                Text("Синхронизация… ${(p * 100).toInt()}%", color = Color(0xB3FFFFFF), style = MaterialTheme.typography.bodySmall)
+            }
+            !ready -> Text("Чтобы синхронизировать, скачай модель распознавания в настройках", color = Color(0x80FFFFFF), style = MaterialTheme.typography.bodySmall)
+            else -> OutlinedButton({ np.uri?.let { Transcriber.startAlign(ctx, id, it, lines) } }, enabled = np.uri != null) { Text("Синхронизировать по голосу") }
+        }
+        Transcriber.errors[id]?.let { Text("Ошибка: $it", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall) }
     }
 }
