@@ -74,7 +74,7 @@ object Eq {
         eq = null; available = false
     }
 
-    fun setEnabled(on: Boolean) {
+    fun enable(on: Boolean) {
         enabled = on
         try { eq?.enabled = on } catch (_: Exception) { }
         persist()
