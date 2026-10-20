@@ -30,12 +30,12 @@ object WP {
     val ok: Color get() = if (light) Color(0xFF1B7F5C) else Color(0xFF6EE7B7)
 
     /** Акцент как заливка (кнопки, активные плашки): текст на нём всегда тёмный. */
-    val accent: Color get() = Color(Style.accent)
+    val accent: Color get() = if (Style.coverAccent) (CoverTint.shown ?: Color(Style.accent)) else Color(Style.accent)
     val onAccent: Color get() = Color(0xFF0B0B10)
     /** Акцент как цвет текста и значков на поверхности: на светлом фоне затемняется, чтобы читался. */
-    val accentInk: Color get() = if (light) lerp(Color(Style.accent), Color.Black, 0.45f) else Color(Style.accent)
+    val accentInk: Color get() = if (light) lerp(accent, Color.Black, 0.45f) else accent
     /** Мягкая подсветка активной строки. */
-    val selFill: Color get() = Color(Style.accent).copy(if (light) 0.18f else 0.14f)
+    val selFill: Color get() = accent.copy(if (light) 0.18f else 0.14f)
 
     /** Цвета поверх обложек и тёмных градиентов: всегда светлые, не зависят от темы. */
     val onArt: Color = Color.White
@@ -96,6 +96,6 @@ object DS {
     val navH = 60.dp             // высота нижней навигации (без системной панели)
     val miniH = 60.dp            // высота мини-плеера
     val miniCover = 44           // обложка в мини-плеере (dp)
-    val coverRow = 52            // обложка в строках списков (dp)
+    val coverRow = 56            // обложка в строках списков (dp)
     val bottomReserve = 148.dp   // запас по умолчанию, пока панели не измерены
 }

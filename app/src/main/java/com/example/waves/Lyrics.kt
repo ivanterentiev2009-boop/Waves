@@ -263,8 +263,8 @@ fun LyricsScreen(c: MediaController?, np: NowPlaying, onBack: () -> Unit) {
             SeekBar(c, pos)
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically) {
-                val tintS by animateColorAsState(if (np.shuffle) Color(Style.accent) else WP.text, label = "sh")
-                val tintR by animateColorAsState(if (np.repeat != 0) Color(Style.accent) else WP.text, label = "rp")
+                val tintS by animateColorAsState(if (np.shuffle) WP.accent else WP.text, label = "sh")
+                val tintR by animateColorAsState(if (np.repeat != 0) WP.accent else WP.text, label = "rp")
                 IconButton({ c?.shuffleModeEnabled = !np.shuffle }) { Icon(Icons.Default.Shuffle, null, tint = tintS) }
                 Controls(c, np.playing)
                 IconButton({ c?.repeatMode = (np.repeat + 1) % 3 }) {

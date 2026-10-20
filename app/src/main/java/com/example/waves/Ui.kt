@@ -90,7 +90,7 @@ fun MiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () -> Unit = {}) {
                 drawRect(WP.line)
                 val d = (c?.duration ?: 0L).coerceAtLeast(0L)
                 val f = if (d > 0) (pos.value.toFloat() / d).coerceIn(0f, 1f) else 0f
-                drawRect(Color(Style.accent), size = Size(size.width * f, size.height))
+                drawRect(WP.accent, size = Size(size.width * f, size.height))
             })
         }
     }
@@ -140,7 +140,7 @@ private fun CapsuleMiniPlayer(c: MediaController?, np: NowPlaying, onOpen: () ->
 fun Pill(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.clip(CircleShape).background(WP.fill).border(DS.stroke, WP.line, CircleShape).padding(3.dp)) {
         options.forEachIndexed { i, t ->
-            val bg by animateColorAsState(if (i == selected) Color(Style.accent) else Color.Transparent, tween(250), label = "pb")
+            val bg by animateColorAsState(if (i == selected) WP.accent else Color.Transparent, tween(250), label = "pb")
             val fg by animateColorAsState(if (i == selected) WP.onAccent else WP.text2, tween(250), label = "pf")
             Box(Modifier.clip(CircleShape).background(bg).clickable { onSelect(i) }.padding(horizontal = 14.dp, vertical = 7.dp)) {
                 Text(t, color = fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
@@ -175,7 +175,7 @@ fun TrackList(tracks: List<Track>, current: Int, onClick: (Int) -> Unit, modifie
 fun Equalizer(modifier: Modifier = Modifier, playing: Boolean) {
     if (!Style.showViz) return
     val barsState = VizBus.bars.collectAsState()
-    val bottom = Color(Style.accent); val top = if (WP.light) WP.accentInk else lerp(bottom, Color.White, 0.55f)
+    val bottom = WP.accent; val top = if (WP.light) WP.accentInk else lerp(bottom, Color.White, 0.55f)
     Canvas(modifier) {
         if (!playing) return@Canvas
         val bars = barsState.value
@@ -262,7 +262,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
                     transitionSpec = { (slideInVertically(tween(300)) { it / 2 } + fadeIn(tween(300))) togetherWith
                         (slideOutVertically(tween(200)) { -it / 2 } + fadeOut(tween(200))) }, label = "line") { t ->
                     Text(t.ifBlank { "♪" }, Modifier.fillMaxWidth().padding(top = 6.dp, start = 4.dp),
-                        color = lerp(Color(Style.accent), Color.White, 0.6f), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                        color = lerp(WP.accent, Color.White, 0.6f), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
@@ -274,7 +274,7 @@ private fun PanelView(c: MediaController?, np: NowPlaying, full: Boolean, setMod
                     if (t == 0) {
                         if (c != null) LazyColumn(Modifier.height(200.dp)) {
                             items(c.mediaItemCount) { i ->
-                                val sel by animateColorAsState(if (i == np.index) Color(Style.accent).copy(0.25f) else Color.Transparent, label = "q")
+                                val sel by animateColorAsState(if (i == np.index) WP.accent.copy(0.25f) else Color.Transparent, label = "q")
                                 Text(c.getMediaItemAt(i).mediaMetadata.title?.toString() ?: "", Modifier.fillMaxWidth()
                                     .clip(DS.shapeS).background(sel)
                                     .clickable { c.seekTo(i, 0); c.play() }.padding(10.dp),
@@ -303,7 +303,7 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, hint: String, mo
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    val accent = Color(Style.accent)
+    val accent = WP.accent
     val ring by animateColorAsState(if (focused) accent else Color.Transparent, tween(250), label = "sfr")
     val icon by animateColorAsState(if (focused) accent else WP.text2, tween(250), label = "sfi")
     Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp)) {

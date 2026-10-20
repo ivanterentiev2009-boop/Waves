@@ -97,7 +97,7 @@ object Recent {
 @Composable
 internal fun ArtFill(uri: Uri?) {
     if (uri != null) AsyncImage(uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-    else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(Style.accent).copy(0.5f), Color(0xFFFF8AD8).copy(0.4f)))),
+    else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(WP.accent.copy(0.5f), Color(0xFFFF8AD8).copy(0.4f)))),
         contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(DS.iconL), tint = WP.text) }
 }
 
@@ -141,7 +141,9 @@ fun StreamingHome(c: MediaController?, np: NowPlaying, device: List<Track>, star
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).onSizeChanged { barH = with(density) { it.height.toDp() } }) {
+        Column(Modifier.align(Alignment.BottomCenter)
+            .background(Brush.verticalGradient(listOf(Color.Transparent, WP.bg.copy(0.94f))))   // контент мягко гаснет под панелями
+            .onSizeChanged { barH = with(density) { it.height.toDp() } }) {
             MiniPlayer(c, np, onLyrics)
             NavBar(nav) { i -> if (i == 3) onSettings() else { NavState.tab = i; recentOpen = false } }
         }
@@ -218,6 +220,10 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     val seedTitle: String? = if (seedLive) np.title else source.firstOrNull()?.title
     val seedArtist: String? = if (seedLive) np.artist else source.firstOrNull()?.artist
     val seedArt: Uri? = if (seedLive) np.art else source.firstOrNull()?.art
+    // плитки «По артисту» и «По песне» получают разные обложки: другой трек этого артиста, затем любые другие из подборки
+    val altArts = source.mapNotNull { it.art }.distinct().filter { it != heroArt }
+    val artistTileArt: Uri? = source.firstOrNull { it.artist == seedArtist && it.art != null && it.art != heroArt }?.art ?: altArts.getOrNull(0) ?: seedArt
+    val songTileArt: Uri? = altArts.firstOrNull { it != artistTileArt } ?: artistTileArt
     fun loadWave(resolve: suspend () -> String) {
         scope.launch {
             loading = true; err = null
@@ -244,7 +250,7 @@ private fun HomeTab(c: MediaController?, np: NowPlaying, startPlay: (List<Track>
     fun shake() = loadWave { Wave.station }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomInset())) {
         item {
-            WaveHero(np, heroArt, listOf(seedArt), np.playing && Wave.active, loading,
+            WaveHero(np, heroArt, listOf(artistTileArt, songTileArt), np.playing && Wave.active, loading,
                 onToggle = { if (!Wave.active) startStation("wave") else if (np.playing) c?.pause() else c?.play() },
                 artistName = seedArtist, songName = seedTitle,
                 activeKind = if (!Wave.active) null else when {

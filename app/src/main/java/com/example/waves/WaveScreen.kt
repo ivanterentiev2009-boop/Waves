@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -84,7 +85,7 @@ private fun PlayOrb(size: Dp, playing: Boolean, loading: Boolean, bars: State<Fl
             val e = if (playing && b.isNotEmpty()) b.average().toFloat() else 0f
             scaleX = 1f + e * 0.18f; scaleY = 1f + e * 0.18f
         }
-        .clip(CircleShape).background(Color(Style.accent)).clickable(onClick = onToggle), contentAlignment = Alignment.Center) {
+        .clip(CircleShape).background(WP.accent).clickable(onClick = onToggle), contentAlignment = Alignment.Center) {
         if (loading) CircularProgressIndicator(Modifier.size(size * 0.37f), color = Color.Black, strokeWidth = 3.dp)
         else Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(size * 0.52f), tint = Color.Black)
     }
@@ -117,7 +118,7 @@ private fun ShakeChip(modifier: Modifier, onShake: () -> Unit) {
 private fun WaveTile(label: String, name: String?, art: Uri?, tint: Color, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val shape = DS.shapeM
     Box(modifier.clip(shape).background(WP.fill)
-        .then(if (active) Modifier.border(DS.strokeSel, Color(Style.accent), shape) else Modifier)
+        .then(if (active) Modifier.border(DS.strokeSel, WP.accent, shape) else Modifier)
         .clickable(onClick = onClick)) {
         ArtFill(art)
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(tint.copy(0.25f), Color.Black.copy(0.78f)))))
@@ -138,7 +139,7 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
                         bars: State<FloatArray>, bob: State<Float>, onToggle: () -> Unit, onOverlay: (() -> Unit)?,
                         artistName: String?, songName: String?, activeKind: String?,
                         onStation: ((String) -> Unit)?, onShake: (() -> Unit)?) {
-    val accent = Color(Style.accent)
+    val accent = WP.accent
     val mainShape = DS.shapeL
     val tileArt = extra.getOrNull(0) ?: art
     Column(Modifier.fillMaxWidth().padding(horizontal = DS.padL)) {
@@ -154,10 +155,16 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
             ArtFill(art)
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(colorStops = arrayOf(0.30f to Color.Transparent, 1f to Color.Black.copy(0.84f)))))
             Canvas(Modifier.matchParentSize()) {
+                // линия реагирует на музыку: низкие частоты (бас, бит) поднимают амплитуду, спектр задаёт рябь по ширине.
+                // Без воспроизведения остаётся спокойная волна.
+                val b = bars.value
+                val beat = if (playing) (0 until 6).sumOf { b.at(it).toDouble() }.toFloat() / 6f else 0f
+                val amp = (7f + beat * 22f).dp.toPx()
                 val path = Path(); val steps = 40
                 for (st in 0..steps) {
                     val x = size.width * st / steps
-                    val y = size.height * 0.50f + sin(st * 0.30f + bob.value) * 9.dp.toPx()
+                    val ripple = if (playing) b.at(st * b.size / (steps + 1)) * 6.dp.toPx() * sin(st * 0.9f + bob.value * 3f) else 0f
+                    val y = size.height * 0.50f + sin(st * 0.30f + bob.value) * amp + ripple
                     if (st == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 drawPath(path, accent.copy(0.55f), style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
@@ -190,7 +197,7 @@ private fun CollageHero(np: NowPlaying, art: Uri?, extra: List<Uri?>, playing: B
 @Composable
 private fun PulseHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Boolean,
                       bars: State<FloatArray>, bob: State<Float>, onToggle: () -> Unit, onOverlay: (() -> Unit)?, onShake: (() -> Unit)?) {
-    val accent = Color(Style.accent)
+    val accent = WP.accent
     Box(Modifier.fillMaxWidth().height(490.dp)) {
         Canvas(Modifier.fillMaxSize()) {
             val b = bars.value
@@ -235,7 +242,7 @@ private fun PulseHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Bool
 @Composable
 private fun SurfHero(np: NowPlaying, art: Uri?, playing: Boolean, loading: Boolean,
                      bars: State<FloatArray>, bob: State<Float>, onToggle: () -> Unit, onOverlay: (() -> Unit)?, onShake: (() -> Unit)?) {
-    val accent = Color(Style.accent); val pink = Color(0xFFFF8AD8); val cyan = Color(0xFF5CC8FF)
+    val accent = WP.accent; val pink = Color(0xFFFF8AD8); val cyan = Color(0xFF5CC8FF)
     val shape = DS.shapeL
     Box(Modifier.fillMaxWidth().padding(horizontal = DS.padM, vertical = 6.dp).height(450.dp)
         .clip(shape).border(DS.stroke, DS.lineColor, shape)) {
@@ -290,11 +297,15 @@ fun fmtDuration(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackRow(t: Track, sel: Boolean, extra: List<Pair<String, () -> Unit>> = emptyList(), onClick: () -> Unit) {
+fun TrackRow(t: Track, sel: Boolean, extra: List<Pair<String, () -> Unit>> = emptyList(), divider: Boolean = false, onClick: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(horizontal = DS.padM).clip(DS.shapeM)
         .background(if (sel) WP.selFill else Color.Transparent)
-        .combinedClickable(onClick = onClick, onLongClick = { menu = true }).padding(horizontal = DS.padS, vertical = 6.dp),
+        .then(if (divider && !sel) Modifier.drawBehind {
+            val x = (DS.padS + DS.coverRow.dp + DS.padM).toPx()
+            drawLine(WP.line, androidx.compose.ui.geometry.Offset(x, size.height - 0.5.dp.toPx()), androidx.compose.ui.geometry.Offset(size.width - DS.padS.toPx(), size.height - 0.5.dp.toPx()), 1.dp.toPx())
+        } else Modifier)
+        .combinedClickable(onClick = onClick, onLongClick = { menu = true }).padding(horizontal = DS.padS, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Cover(t.art, DS.coverRow); Spacer(Modifier.width(DS.padM))
         Column(Modifier.weight(1f)) {

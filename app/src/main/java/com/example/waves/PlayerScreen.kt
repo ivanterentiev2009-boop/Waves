@@ -90,7 +90,7 @@ fun PlayerScreen(c: MediaController?, np: NowPlaying, onArtist: () -> Unit = {},
     var editIndex by remember { mutableStateOf<Int?>(null) }
     val lyr = rememberLyrics(np.id, np.title, np.artist, c)
     val pos = rememberPosition(c, np.playing, 80)
-    val accent = Color(Style.accent)
+    val accent = WP.accent
 
     editIndex?.let { i -> if (i in lyr.lines.indices) EditLineDialog(ctx, np.id, lyr.lines, i) { editIndex = null } }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

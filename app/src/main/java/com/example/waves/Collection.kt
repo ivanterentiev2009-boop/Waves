@@ -141,7 +141,7 @@ fun CollectionScreen(np: NowPlaying, device: List<Track>, startPlay: (List<Track
                             else -> "На устройстве не найдено музыки"
                         })
                     }
-                    itemsIndexed(tracks, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id) { startPlay(tracks, i) } }
+                    itemsIndexed(tracks, key = { _, t -> t.id }) { i, t -> TrackRow(t, t.id == np.id, divider = true) { startPlay(tracks, i) } }
                 }
                 1 -> {
                     val tiles: List<Playlist?> = (if (q.isEmpty()) listOf<Playlist?>(null) else emptyList()) + playlists
@@ -217,7 +217,7 @@ private fun CollectionDetail(o: CollOpen, library: List<Track>, np: NowPlaying, 
         if (tracks.isEmpty()) item { CollHint("Пусто. Нажмите и удерживайте трек, затем выберите «Добавить в плейлист».") }
         itemsIndexed(tracks, key = { _, t -> t.id }) { i, t ->
             val extra = if (pl != null) listOf("Удалить из плейлиста" to { Playlists.removeTrack(pl.id, t) }) else emptyList()
-            TrackRow(t, t.id == np.id, extra) { startPlay(tracks, i) }
+            TrackRow(t, t.id == np.id, extra, true) { startPlay(tracks, i) }
         }
     }
 }

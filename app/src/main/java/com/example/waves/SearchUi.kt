@@ -27,6 +27,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -82,7 +83,7 @@ fun ChipRow(items: List<Pair<ImageVector?, String>>, selected: Int, onSelect: (I
     Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(DS.padS)) {
         items.forEachIndexed { i, (icon, label) ->
             val on = i == selected
-            val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "cb")
+            val bg by animateColorAsState(if (on) WP.accent else Color.Transparent, tween(250), label = "cb")
             val fg by animateColorAsState(if (on) WP.onAccent else WP.text, tween(250), label = "cf")
             val line by animateColorAsState(if (on) Color.Transparent else WP.line, tween(250), label = "cl")
             Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { onSelect(i) }
@@ -110,7 +111,7 @@ fun SearchBox(value: String, onValueChange: (String) -> Unit, hint: String, badg
               suggest: ((String) -> List<String>)?, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
     val ctx = LocalContext.current
     remember { SearchHistory.init(ctx) }
-    Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp)) {
+    Frosted(CircleShape, modifier.fillMaxWidth().height(48.dp).alpha(if (SearchHost.req != null) 0f else 1f)) {   // пока открыта панель поиска, строка под ней скрыта
         Row(Modifier.fillMaxSize().clickable {
             SearchHost.req = SearchReq(value, hint, badge, suggest) { q -> SearchHistory.add(q); onValueChange(q); onSearch() }
         }.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -147,7 +148,7 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
     var text by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
     var sugg by remember { mutableStateOf<List<String>>(emptyList()) }
     val focus = remember { FocusRequester() }
-    val accent = Color(Style.accent)
+    val accent = WP.accent
     LaunchedEffect(Unit) { try { focus.requestFocus() } catch (_: IllegalStateException) { } }
     LaunchedEffect(text.text) {
         val q = text.text.trim()
@@ -175,7 +176,7 @@ private fun SearchOverlay(initial: String, hint: String, badge: String, suggest:
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }) {
                 if (q.isBlank() && SearchHistory.items.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Недавние", Modifier.weight(1f), color = WP.text2, style = MaterialTheme.typography.labelLarge)
-                    TextButton({ SearchHistory.clear() }) { Text("Очистить", color = Color(Style.accent)) }
+                    TextButton({ SearchHistory.clear() }) { Text("Очистить", color = WP.accent) }
                 }
                 list.forEach { s ->
                     Row(Modifier.fillMaxWidth().clickable { submit(s) }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -234,7 +235,7 @@ fun WaveSourceChips(modifier: Modifier = Modifier) {
         Text("Откуда музыка в волне", color = WP.text2, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             chips.forEachIndexed { i, (label, on) ->
-                val bg by animateColorAsState(if (on) Color(Style.accent) else Color.Transparent, tween(250), label = "wsb")
+                val bg by animateColorAsState(if (on) WP.accent else Color.Transparent, tween(250), label = "wsb")
                 val fg by animateColorAsState(if (on) WP.onAccent else WP.text, tween(250), label = "wsf")
                 val line by animateColorAsState(if (on) Color.Transparent else WP.line, tween(250), label = "wsl")
                 Row(Modifier.clip(CircleShape).background(bg).border(DS.stroke, line, CircleShape).clickable { toggle(i) }

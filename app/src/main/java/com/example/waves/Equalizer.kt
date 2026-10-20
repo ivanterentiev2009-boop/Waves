@@ -74,7 +74,7 @@ object Eq {
         eq = null; available = false
     }
 
-    fun enable(on: Boolean) {
+    fun toggleEq(on: Boolean) {
         enabled = on
         try { eq?.enabled = on } catch (_: Exception) { }
         persist()
@@ -82,7 +82,7 @@ object Eq {
 
     fun setLevel(band: Int, mB: Int) {
         if (band !in levels.indices) return
-        if (!enabled) enable(true)
+        if (!enabled) toggleEq(true)
         val v = mB.coerceIn(minLevel, maxLevel)
         levels[band] = v; preset = -1
         try { eq?.setBandLevel(band.toShort(), v.toShort()) } catch (_: Exception) { }
@@ -91,7 +91,7 @@ object Eq {
 
     fun usePreset(i: Int) {
         if (i !in presets.indices) return
-        if (!enabled) enable(true)
+        if (!enabled) toggleEq(true)
         try {
             eq?.usePreset(i.toShort())
             eq?.let { e -> for (b in levels.indices) levels[b] = e.getBandLevel(b.toShort()).toInt() }
@@ -128,7 +128,7 @@ fun EqualizerSheet(onDismiss: () -> Unit) {
         Column(Modifier.navigationBarsPadding().padding(horizontal = DS.padL).padding(bottom = DS.padL).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Эквалайзер", Modifier.weight(1f), color = WP.text, style = MaterialTheme.typography.titleLarge)
-                Switch(Eq.enabled, { Eq.enable(it) }, enabled = Eq.available)
+                Switch(Eq.enabled, { Eq.toggleEq(it) }, enabled = Eq.available)
             }
             if (!Eq.available) {
                 Text("Эквалайзер подключается к плееру: запустите любой трек. Если он не появился, устройство его не поддерживает.",

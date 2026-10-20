@@ -87,8 +87,8 @@ private fun Hint(text: String) {
 private fun NavRow(icon: ImageVector, title: String, summary: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().panel(DS.shapeM)
         .clickable(onClick = onClick).padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(Color(Style.accent)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(DS.iconM), tint = Color.Black)
+        Box(Modifier.size(40.dp).clip(CircleShape).background(WP.accent.copy(0.20f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(DS.iconM), tint = WP.accentInk)
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -199,8 +199,8 @@ private fun Hub(onBack: () -> Unit, open: (Int) -> Unit) {
                     ", SoundCloud: " + (if (SoundCloud.hasKey) "ключ есть" else "нет ключа")) { open(5) }
             NavRow(Icons.Default.Subtitles, "Тексты песен", "Автоматический поиск и синхронизация") { open(3) }
             Row(Modifier.fillMaxWidth().panel(DS.shapeM).clickable { advancedOpen = !advancedOpen }.padding(DS.padM), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(WP.fill), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Mic, null, Modifier.size(DS.iconM), tint = WP.text)
+                Box(Modifier.size(40.dp).clip(CircleShape).background(WP.accent.copy(0.20f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Mic, null, Modifier.size(DS.iconM), tint = WP.accentInk)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
@@ -234,6 +234,9 @@ private fun LookPage(onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ThemeTile(THEME_IDS[4], Modifier.weight(1f)); Spacer(Modifier.weight(1f))
             }
+        }
+        Group("Цвет из обложки") {
+            SwitchRow("Акцент из обложки", Style.coverAccent, "Активные элементы подстраиваются под цвет текущего трека") { Style.coverAccent = it; Style.save() }
         }
         Group("Нижние панели") {
             Text("Мини-плеер и навигация", color = WP.text2, style = MaterialTheme.typography.bodySmall)
